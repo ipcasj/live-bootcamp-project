@@ -33,3 +33,5 @@ docker compose up
 ```
 
 visit http://localhost:8000 and http://localhost:3000
+
+or from http://localhost:8000 click the 'Log in' in the right top corner to open http://localhost:3000
