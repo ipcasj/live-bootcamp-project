@@ -2,10 +2,18 @@
 name = "auth-service"
 version = "0.1.0"
 edition = "2021"
+# Optional metadata for clarity and best practice
+authors = ["Igor Petrov ihorpetroff@gmail.com"]
+description = "Authentication microservice for live bootcamp project."
+repository = "https://github.com/ipcasj/live-bootcamp-project"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = "0.7.4"
-tokio = { version = "1.36", features = ["full"] }
-tower-http = { version = "0.5.0", features = ["fs"] }
+
+axum = "0.8.4"
+tokio = { version = "1.36.0", features = ["full"] }
+tower-http = { version = "0.6.6", features = ["fs"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+
