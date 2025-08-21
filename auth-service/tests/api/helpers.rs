@@ -1,4 +1,5 @@
 use auth_service::Application;
+use uuid::Uuid;
 
 pub struct TestApp {
     pub address: String,
@@ -31,13 +32,16 @@ impl TestApp {
     }
 
     // Implementation for helper functions for all other routes (signup, login, logout, verify-2fa, and verify-token)
-    pub async fn signup(&self, email: &str, password: &str) -> reqwest::Response {
+    pub async fn signup<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
         self.http_client
             .post(&format!("{}/signup", &self.address))
-            .json(&serde_json::json!({ "email": email, "password": password }))
+            .json(body)
             .send()
             .await
-            .expect("Failed to execute request")
+            .expect("Failed to execute request.")
     }
 
     pub async fn login(&self, email: &str, password: &str) -> reqwest::Response {
@@ -74,4 +78,8 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
-}   
+
+    pub fn get_random_email() -> String {
+        format!("{}@example.com", Uuid::new_v4())
+    }
+}

@@ -14,10 +14,10 @@ impl Application {
     pub async fn build(address: &str) -> Result<Self, Box<dyn Error>> {
 
         let router = Router::new()
-            .route("/signup", post(routes::auth::dummy_handler))
+            .route("/signup", post(routes::signup::signup))
             .route("/login", post(routes::auth::dummy_handler))
             .route("/logout", post(routes::auth::dummy_handler))
-            .route("/verify-2fa", post(routes::auth::dummy_handler))
+            .route("/verify-2fa", post(routes::verify_2fa))
             .route("/verify-token", post(routes::auth::dummy_handler))
             .fallback_service(ServeDir::new("assets"));
 
