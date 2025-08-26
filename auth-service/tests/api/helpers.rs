@@ -8,14 +8,17 @@ pub struct TestApp {
 
 impl TestApp {
     pub async fn new() -> Self {
-        let app = Application::build("127.0.0.1:0")
+        use auth_service::app_state::{AppState, UserStoreType};
+        use auth_service::services::hashmap_user_store::HashmapUserStore;
+        let user_store = std::sync::Arc::new(tokio::sync::RwLock::new(HashmapUserStore::default()));
+        let app_state = AppState::new(user_store);
+
+        let app = Application::build(app_state, "127.0.0.1:0")
             .await
             .expect("Failed to build application");
 
         let address = format!("http://{}", app.address.clone());
 
-        // Run the auth service in a separate async task
-        // to avoid blocking the main test thread. 
         #[allow(clippy::let_underscore_future)]
         let _ = tokio::spawn(app.run());
 

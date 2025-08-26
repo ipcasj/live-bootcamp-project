@@ -1,5 +1,29 @@
+mod domain;
+pub mod app_state {
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+        use crate::services::hashmap_user_store::HashmapUserStore;
+    // If the file is actually named differently (e.g., user_store.rs), update the import like this:
+    // use crate::services::user_store::HashmapUserStore;
+
+    // Using a type alias to improve readability!
+    pub type UserStoreType = Arc<RwLock<HashmapUserStore>>;
+
+    #[derive(Clone)]
+    pub struct AppState {
+        pub user_store: UserStoreType,
+    }
+
+    impl AppState {
+        pub fn new(user_store: UserStoreType) -> Self {
+            Self { user_store }
+        }
+    }
+}
 mod routes;
+pub mod services;
 use axum::{serve::Serve, Router, routing::post};
+use crate::app_state::AppState;
 use tower_http::services::ServeDir;
 use std::error::Error;
 
@@ -11,22 +35,19 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(address: &str) -> Result<Self, Box<dyn Error>> {
-
+    pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
         let router = Router::new()
             .route("/signup", post(routes::signup::signup))
             .route("/login", post(routes::auth::dummy_handler))
             .route("/logout", post(routes::auth::dummy_handler))
             .route("/verify-2fa", post(routes::verify_2fa))
             .route("/verify-token", post(routes::auth::dummy_handler))
-            .fallback_service(ServeDir::new("assets"));
-
+            .fallback_service(ServeDir::new("assets"))
+            .with_state(app_state);
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
         let server = axum::serve(listener, router);
-
-        // Create a new Application instance and return it
         Ok(Application { server, address })
     }
 
