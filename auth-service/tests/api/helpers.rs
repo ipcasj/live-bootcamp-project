@@ -4,26 +4,30 @@ use uuid::Uuid;
 pub struct TestApp {
     pub address: String,
     pub http_client: reqwest::Client,
+    _shutdown_guard: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
 impl TestApp {
     pub async fn new() -> Self {
-    use auth_service::app_state::{AppState, UserStoreType};
-    use auth_service::services::hashmap_user_store::HashmapUserStore;
-    let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(HashmapUserStore::default()));
-    let app_state = AppState::new(user_store);
+        use auth_service::app_state::{AppState, UserStoreType};
+        use auth_service::services::hashmap_user_store::HashmapUserStore;
+        let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(HashmapUserStore::default()));
+        let app_state = AppState::new(user_store);
 
-        let app = Application::build(app_state, "127.0.0.1:0")
+        // Set up a shutdown signal for the test server
+        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+        let app = Application::build(app_state, "127.0.0.1:0", Some(shutdown_rx))
             .await
             .expect("Failed to build application");
 
         let address = format!("http://{}", app.address.clone());
 
+        // Spawn the app server
         #[allow(clippy::let_underscore_future)]
         let _ = tokio::spawn(app.run());
 
         let http_client = reqwest::Client::new();
-        Self { address, http_client }
+        Self { address, http_client, _shutdown_guard: Some(shutdown_tx) }
     }
 
     pub async fn get_root(&self) -> reqwest::Response {

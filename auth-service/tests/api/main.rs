@@ -1,3 +1,4 @@
+mod health_and_openapi;
 mod helpers;
 mod login;
 mod logout;
