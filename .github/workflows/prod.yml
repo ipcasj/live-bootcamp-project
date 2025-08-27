@@ -84,7 +84,8 @@ jobs:
     - name: Copy compose.yml and Caddyfile to droplet
       run: |
         sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:/root/
-        sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no Caddyfile root@${{ vars.DROPLET_IP }}:/root/
+        # Copy Caddyfile to /tmp to avoid permission or file/dir conflict issues
+        sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no Caddyfile root@${{ vars.DROPLET_IP }}:/tmp/
 
     - name: Deploy
       uses: appleboy/ssh-action@master
@@ -93,8 +94,27 @@ jobs:
         username: root
         password: ${{ secrets.DROPLET_PASSWORD }}
         script: |
-          cd ~
+          set -e
+          # Check disk space and permissions
+          echo "Checking disk space and permissions..."
+          df -h || { echo "Disk space check failed"; exit 1; }
+          ls -ld /root || { echo "/root not accessible"; exit 1; }
+          # Remove /root/Caddyfile if it is a directory
+          if [ -d /root/Caddyfile ]; then
+            echo "/root/Caddyfile is a directory, removing..."
+            rm -rf /root/Caddyfile || { echo "Failed to remove /root/Caddyfile directory"; exit 1; }
+          fi
+          # Move Caddyfile from /tmp to /root, overwrite if needed
+          if [ -f /tmp/Caddyfile ]; then
+            mv -f /tmp/Caddyfile /root/Caddyfile || { echo "Failed to move Caddyfile to /root"; exit 1; }
+          else
+            echo "/tmp/Caddyfile not found!"; exit 1;
+          fi
+          # Double-check Caddyfile is a file
+          if [ ! -f /root/Caddyfile ]; then
+            echo "/root/Caddyfile is not a file after move!"; exit 1;
+          fi
           export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
-          docker compose down
+          docker compose down || true
           docker compose pull
           docker compose up -d
