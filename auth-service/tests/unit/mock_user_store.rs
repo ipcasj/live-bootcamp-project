@@ -18,27 +18,27 @@ impl UserStore for MockUserStore {
             return Err(UserStoreError::UnexpectedError);
         }
         let mut users = self.users.lock().unwrap();
-        if users.iter().any(|u| u.email == user.email) {
+        if users.iter().any(|u| u.email.as_ref() == user.email.as_ref()) {
             Err(UserStoreError::UserAlreadyExists)
         } else {
             users.push(user);
             Ok(())
         }
     }
-    async fn get_user(&self, email: &str) -> Result<User, UserStoreError> {
+    async fn get_user(&self, email: &auth_service::domain::Email) -> Result<User, UserStoreError> {
         if self.fail_get {
             return Err(UserStoreError::UnexpectedError);
         }
         let users = self.users.lock().unwrap();
-        users.iter().find(|u| u.email == email).cloned().ok_or(UserStoreError::UserNotFound)
+        users.iter().find(|u| &u.email == email).cloned().ok_or(UserStoreError::UserNotFound)
     }
-    async fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError> {
+    async fn validate_user(&self, email: &auth_service::domain::Email, password: &auth_service::domain::Password) -> Result<(), UserStoreError> {
         if self.fail_validate {
             return Err(UserStoreError::UnexpectedError);
         }
         let users = self.users.lock().unwrap();
-        match users.iter().find(|u| u.email == email) {
-            Some(u) if u.password == password => Ok(()),
+        match users.iter().find(|u| &u.email == email) {
+            Some(u) if &u.password == password => Ok(()),
             Some(_) => Err(UserStoreError::InvalidCredentials),
             None => Err(UserStoreError::UserNotFound),
         }

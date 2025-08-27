@@ -73,20 +73,33 @@ pub async fn signup(
         return Err(AuthAPIError::InvalidCredentials);
     }
 
-    let email = request.email;
-    let password = request.password;
+    // Parse and validate email and password using newtypes
+    let email = match crate::domain::Email::parse(&request.email) {
+        Ok(e) => e,
+        Err(_) => {
+            error!(email = %request.email, "Invalid email format");
+            return Err(AuthAPIError::InvalidCredentials);
+        }
+    };
+    let password = match crate::domain::Password::parse(&request.password) {
+        Ok(p) => p,
+        Err(_) => {
+            error!("Invalid password format");
+            return Err(AuthAPIError::InvalidCredentials);
+        }
+    };
 
     let user = User::new(email, password, request.requires_2fa);
     let mut user_store = state.user_store.write().await;
 
     // Early return AuthAPIError::UserAlreadyExists if email exists in user_store.
     if user_store.get_user(&user.email).await.is_ok() {
-        error!(email = %user.email, "User already exists");
+        error!(email = %user.email.as_ref(), "User already exists");
         return Err(AuthAPIError::UserAlreadyExists);
     }
 
     // Instead of using unwrap, early return AuthAPIError::UnexpectedError if add_user() fails.
-    let user_email = user.email.clone();
+    let user_email = user.email.as_ref().to_owned();
     if let Err(e) = user_store.add_user(user).await {
         error!(?e, "Unexpected error adding user");
         return Err(AuthAPIError::UnexpectedError);

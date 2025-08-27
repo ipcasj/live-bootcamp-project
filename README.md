@@ -1,3 +1,11 @@
+## Quick Integration Test
+To verify all endpoints and flows after any change, run:
+
+```sh
+cd auth-service
+cargo test --test api -- --nocapture
+```
+All tests should pass for a healthy project.
 ## Quick Test Commands (Auth Service)
 After starting the auth-service, you can quickly verify all features are working with these commands:
 

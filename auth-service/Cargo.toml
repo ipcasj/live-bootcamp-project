@@ -9,12 +9,12 @@ repository = "https://github.com/ipcasj/live-bootcamp-project"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+
 [dependencies]
 tracing = "0.1"
 tracing-subscriber = "0.3"
-validator = { version = "0.16", features = ["derive"] }
+validator = { version = "0.16.1", features = ["derive"] }
 utoipa = { version = "4", features = ["axum_extras"] }
-
 axum = "0.8.4"
 async-trait = "0.1.78"
 tokio = { version = "1.36.0", features = ["full"] }
@@ -24,4 +24,10 @@ serde_json = "1.0.143"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 goose = "0.18"
 uuid = { version = "1.7.0", features = ["v4", "serde"] }
+thiserror = "1.0"
+
+[dev-dependencies]
+fake = "=2.3.0"
+quickcheck = "0.9.2"
+quickcheck_macros = "0.9.1"
 

@@ -22,9 +22,11 @@ async fn signup_returns_201_on_success() {
 #[tokio::test]
 async fn signup_returns_409_on_duplicate() {
     let mut mock = MockUserStore::default();
+    let email = auth_service::domain::Email::parse("test@example.com").unwrap();
+    let password = auth_service::domain::Password::parse("password123").unwrap();
     mock.add_user(auth_service::domain::User::new(
-        "test@example.com".to_string(),
-        "password123".to_string(),
+        email,
+        password,
         false,
     )).await.unwrap();
     let mock_store = Arc::new(RwLock::new(mock));
