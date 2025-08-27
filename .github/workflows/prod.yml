@@ -83,8 +83,8 @@ jobs:
 
     - name: Copy compose.yml and Caddyfile to droplet
       run: |
-        sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:~
-        sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no Caddyfile root@${{ vars.DROPLET_IP }}:~
+        sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no compose.yml root@${{ vars.DROPLET_IP }}:/root/
+        sshpass -v -p '${{ secrets.DROPLET_PASSWORD }}' scp -o StrictHostKeyChecking=no Caddyfile root@${{ vars.DROPLET_IP }}:/root/
 
     - name: Deploy
       uses: appleboy/ssh-action@master
