@@ -1,33 +1,62 @@
-use auth_service::Application;
+
+use auth_service::{Application, grpc};
 use uuid::Uuid;
+use tonic::transport::Server;
+use std::sync::Arc;
+use tokio::sync::{oneshot, RwLock};
+
 
 pub struct TestApp {
     pub address: String,
+    pub grpc_addr: String,
     pub http_client: reqwest::Client,
-    _shutdown_guard: Option<tokio::sync::oneshot::Sender<()>>,
+    shutdown_guard: Option<oneshot::Sender<()>>,
+    grpc_shutdown_guard: Option<oneshot::Sender<()>>,
 }
+
 
 impl TestApp {
     pub async fn new() -> Self {
         use auth_service::app_state::{AppState, UserStoreType};
         use auth_service::services::hashmap_user_store::HashmapUserStore;
-        let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(HashmapUserStore::default()));
-        let app_state = AppState::new(user_store);
+        let user_store: UserStoreType = Arc::new(RwLock::new(HashmapUserStore::default()));
+    let app_state = Arc::new(AppState::new(user_store.clone()));
 
-        // Set up a shutdown signal for the test server
-        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
-        let app = Application::build(app_state, "127.0.0.1:0", Some(shutdown_rx))
+        // REST server
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let app = Application::build((*app_state).clone(), "127.0.0.1:0", Some(shutdown_rx))
             .await
             .expect("Failed to build application");
-
         let address = format!("http://{}", app.address.clone());
-
-        // Spawn the app server
-        #[allow(clippy::let_underscore_future)]
-        let _ = tokio::spawn(app.run());
-
         let http_client = reqwest::Client::new();
-        Self { address, http_client, _shutdown_guard: Some(shutdown_tx) }
+        tokio::spawn(app.run());
+
+        // gRPC server
+        let (grpc_shutdown_tx, grpc_shutdown_rx) = oneshot::channel();
+        let grpc_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("Failed to bind gRPC");
+        let grpc_addr = grpc_listener.local_addr().unwrap();
+        let grpc_service = grpc::grpc_service(app_state.clone());
+        let grpc_shutdown = async move {
+            let _ = grpc_shutdown_rx.await;
+        };
+        tokio::spawn(async move {
+            Server::builder()
+                .add_service(grpc_service)
+                .serve_with_incoming_shutdown(
+                    tokio_stream::wrappers::TcpListenerStream::new(grpc_listener),
+                    grpc_shutdown,
+                )
+                .await
+                .expect("gRPC server failed");
+        });
+
+        Self {
+            address,
+            grpc_addr: format!("http://{}", grpc_addr),
+            http_client,
+            shutdown_guard: Some(shutdown_tx),
+            grpc_shutdown_guard: Some(grpc_shutdown_tx),
+        }
     }
 
     pub async fn get_root(&self) -> reqwest::Response {
@@ -88,5 +117,16 @@ impl TestApp {
 
     pub fn get_random_email() -> String {
         format!("{}@example.com", Uuid::new_v4())
+    }
+}
+
+impl Drop for TestApp {
+    fn drop(&mut self) {
+        if let Some(tx) = self.shutdown_guard.take() {
+            let _ = tx.send(());
+        }
+        if let Some(tx) = self.grpc_shutdown_guard.take() {
+            let _ = tx.send(());
+        }
     }
 }

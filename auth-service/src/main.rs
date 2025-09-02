@@ -3,10 +3,11 @@
 //! - Initializes logging and application state.
 //! - Starts the Axum server.
 use tracing_subscriber;
-
 use auth_service::Application;
 use auth_service::app_state::{AppState, UserStoreType};
 use auth_service::services::hashmap_user_store::HashmapUserStore;
+use auth_service::grpc;
+use tonic::transport::Server;
 
 #[tokio::main]
 async fn main() {
@@ -17,9 +18,14 @@ async fn main() {
 
     // Set up graceful shutdown signal (Ctrl+C)
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
-    let app = Application::build(app_state, "0.0.0.0:3000", Some(shutdown_rx))
+    let app = Application::build(app_state.clone(), "0.0.0.0:3000", Some(shutdown_rx))
         .await
         .expect("Failed to build app");
+
+    // gRPC server address
+    let grpc_addr = "0.0.0.0:50051".parse().unwrap();
+    let grpc_state = std::sync::Arc::new(app_state);
+    let grpc_service = grpc::grpc_service(grpc_state);
 
     // Spawn a task to listen for Ctrl+C
     tokio::spawn(async move {
@@ -28,5 +34,17 @@ async fn main() {
         }
     });
 
-    app.run().await.expect("Failed to run app");
+    // Run both REST and gRPC servers in parallel
+    tokio::select! {
+        res = app.run() => {
+            if let Err(e) = res {
+                eprintln!("REST server error: {}", e);
+            }
+        }
+        res = Server::builder().add_service(grpc_service).serve(grpc_addr) => {
+            if let Err(e) = res {
+                eprintln!("gRPC server error: {}", e);
+            }
+        }
+    }
 }

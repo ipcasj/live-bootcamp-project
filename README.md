@@ -1,11 +1,15 @@
-## Quick Integration Test
-To verify all endpoints and flows after any change, run:
+## Quick Integration Test (REST & gRPC)
+To verify all REST and gRPC endpoints after any change, run:
 
 ```sh
 cd auth-service
 cargo test --test api -- --nocapture
 ```
-All tests should pass for a healthy project.
+This runs all REST and gRPC regression tests. All tests should pass for a healthy project.
+
+**gRPC regression tests:**
+- See `tests/api/grpc_regression.rs` for gRPC endpoint coverage.
+- The gRPC server must be running and listening on `127.0.0.1:50051` for these tests to pass (adjust address in the test if needed).
 ## Quick Test Commands (Auth Service)
 After starting the auth-service, you can quickly verify all features are working with these commands:
 

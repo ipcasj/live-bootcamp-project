@@ -1,3 +1,4 @@
+use crate::ErrorResponse;
 /// Health check endpoint for the auth-service.
 #[utoipa::path(
     get,

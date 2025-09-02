@@ -1,3 +1,4 @@
+pub mod grpc;
 mod api_doc;
 /// Main library file for the auth-service crate.
 ///
@@ -29,7 +30,7 @@ use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
 use crate::domain::AuthAPIError;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ErrorResponse {
     pub error: String,
 }
