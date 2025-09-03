@@ -40,12 +40,31 @@ impl UserStore for HashmapUserStore {
             None => Err(UserStoreError::UserNotFound),
         }
     }
+
+    async fn delete_user(&mut self, email: &Email) -> Result<(), UserStoreError> {
+        if self.users.remove(email).is_some() {
+            Ok(())
+        } else {
+            Err(UserStoreError::UserNotFound)
+        }
+    }
 }
 
 // TODO: Add unit tests for your `HashmapUserStore` implementation
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_delete_user() {
+        let mut store = HashmapUserStore::default();
+        let email = crate::domain::Email::parse("test@example.com").unwrap();
+        let password = crate::domain::Password::parse("password").unwrap();
+        let user = User::new(email.clone(), password, false);
+        store.add_user(user).await.unwrap();
+        assert_eq!(store.delete_user(&email).await, Ok(()));
+        assert_eq!(store.get_user(&email).await, Err(UserStoreError::UserNotFound));
+    }
 
     #[tokio::test]
     async fn test_add_user() {

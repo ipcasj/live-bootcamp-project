@@ -1,3 +1,54 @@
+// --- Delete Account Button Logic ---
+const deleteAccountBtn = document.getElementById("delete-account-btn");
+let currentUserEmail = null; // Track logged-in user
+
+// Show delete button only when logged in
+function showDeleteButton(email) {
+    currentUserEmail = email;
+    deleteAccountBtn.style.display = "inline-block";
+}
+function hideDeleteButton() {
+    currentUserEmail = null;
+    deleteAccountBtn.style.display = "none";
+}
+
+deleteAccountBtn.addEventListener("click", async () => {
+    if (!currentUserEmail) {
+        alert("No user logged in.");
+        return;
+    }
+    if (!confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
+    deleteAccountBtn.disabled = true;
+    const res = await fetch('/delete-account', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-user-email': currentUserEmail
+        }
+    });
+    deleteAccountBtn.disabled = false;
+    if (res.ok) {
+        alert('Account deleted.');
+        hideDeleteButton();
+        // Log out, clear forms, etc.
+        loginSection.style.display = "block";
+        twoFASection.style.display = "none";
+        signupSection.style.display = "none";
+        // Optionally clear all forms
+        loginForm.email.value = "";
+        loginForm.password.value = "";
+        signupForm.email.value = "";
+        signupForm.password.value = "";
+        signupForm.twoFA.checked = false;
+    } else {
+        let msg = 'Failed to delete account.';
+        try {
+            const data = await res.json();
+            if (data && data.error) msg = data.error;
+        } catch {}
+        alert(msg);
+    }
+});
 const loginSection = document.getElementById("login-section");
 const twoFASection = document.getElementById("2fa-section");
 const signupSection = document.getElementById("signup-section");
@@ -66,6 +117,8 @@ loginButton.addEventListener("click", (e) => {
             loginForm.email.value = "";
             loginForm.password.value = "";
             loginErrAlter.style.display = "none";
+            // Show delete button for logged-in user
+            showDeleteButton(email);
             alert("You have successfully logged in.");
         } else {
             response.json().then(data => {
@@ -108,6 +161,8 @@ signupButton.addEventListener("click", (e) => {
             loginSection.style.display = "block";
             twoFASection.style.display = "none";
             signupSection.style.display = "none";
+            // Optionally, show delete button for new user (if auto-login)
+            // showDeleteButton(email);
         } else {
             response.json().then(data => {
                 let error_msg = data.error;
@@ -149,6 +204,7 @@ TwoFAButton.addEventListener("click", (e) => {
             loginSection.style.display = "block";
             twoFASection.style.display = "none";
             signupSection.style.display = "none";
+            showDeleteButton(email);
         } else {
             response.json().then(data => {
                 let error_msg = data.error;

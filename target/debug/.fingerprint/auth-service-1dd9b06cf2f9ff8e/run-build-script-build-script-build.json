@@ -1,1 +1,0 @@
-{"rustc":12610991425282158916,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[13301484910512036096,"build_script_build",false,9558150400333160112]],"local":[{"RerunIfChanged":{"output":"debug/build/auth-service-1dd9b06cf2f9ff8e/output","paths":["proto/auth.proto","proto"]}}],"rustflags":[],"config":0,"compile_kind":0}

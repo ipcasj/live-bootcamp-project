@@ -1,3 +1,11 @@
+    pub async fn delete_account(&self, email: &str) -> reqwest::Response {
+        self.http_client
+            .delete(&format!("{}/delete-account", &self.address))
+            .header("x-user-email", email)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 
 use auth_service::{Application, grpc};
 use uuid::Uuid;
