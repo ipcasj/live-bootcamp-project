@@ -9,7 +9,7 @@ service AuthService {
 message SignupRequest {
   string email = 1;
   string password = 2;
-  bool requires2FA = 3;
+  bool requires2_fa = 3;
 }
 message SignupResponse {
   string message = 1;

@@ -28,7 +28,7 @@ impl AuthService for MyAuthService {
         // Validate email and password
         let email = Email::parse(&req.email).map_err(|_| Status::invalid_argument("Invalid email"))?;
         let password = Password::parse(&req.password).map_err(|_| Status::invalid_argument("Invalid password"))?;
-        let user = User::new(email.clone(), password, req.requires2_fa);
+    let user = User::new(email.clone(), password, req.requires2_fa);
         let mut user_store = self.state.user_store.write().await;
         if user_store.get_user(&email).await.is_ok() {
             return Err(Status::already_exists("User already exists"));
