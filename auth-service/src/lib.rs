@@ -26,26 +26,39 @@ mod api_doc;
 /// Error response returned by API endpoints.
 /// Main application struct for the auth-service.
 /// Application builder and runner implementation.
-use axum::{http::StatusCode, response::{IntoResponse, Response}, Json};
+use axum::{response::{IntoResponse, Response}, Json};
 use crate::domain::AuthAPIError;
 use serde::{Deserialize, Serialize};
 
+
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ErrorResponse {
+    pub code: String,
     pub error: String,
+    pub trace_id: Option<String>,
 }
+
+// use tracing::Span; // Uncomment if needed for future tracing
+// use tracing::field::Field;
+// use tracing::dispatcher;
+// use uuid::Uuid; // Used in add_trace_id, keep if needed
 
 impl IntoResponse for AuthAPIError {
     fn into_response(self) -> Response {
-        let (status, error_message) = match self {
-            AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, "User already exists"),
-            AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, "Invalid credentials"),
-            AuthAPIError::UnexpectedError => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
+        use axum::http::StatusCode;
+        let (status, error_message) = match &self {
+            AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, self.to_string()),
+            AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, self.to_string()),
+            AuthAPIError::UnexpectedError(e) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, format!("Unexpected error: {}", e))
             }
         };
+        // Get trace_id from tracing span if available
+        // No access to request extensions here, so trace_id is not available
         let body = Json(ErrorResponse {
-            error: error_message.to_string(),
+            code: self.code().to_string(),
+            error: error_message,
+            trace_id: None,
         });
         (status, body).into_response()
     }
@@ -87,19 +100,36 @@ pub struct Application {
 impl Application {
     pub async fn build(app_state: AppState, address: &str, shutdown_signal: Option<tokio::sync::oneshot::Receiver<()>>) -> Result<Self, Box<dyn Error>> {
     use utoipa::OpenApi;
-        use axum::routing::get;
-        let openapi = crate::api_doc::ApiDoc::openapi();
-        let openapi_json = serde_json::to_string(&openapi).unwrap();
+    use axum::routing::get;
+    let openapi = crate::api_doc::ApiDoc::openapi();
+    let openapi_json = serde_json::to_string(&openapi).unwrap();
+    use tower_http::trace::TraceLayer;
+    use tower_http::catch_panic::CatchPanicLayer;
+    use axum::middleware::from_fn;
+    use uuid::Uuid;
+
+        // Middleware to inject a trace_id into each request span
+    async fn add_trace_id(req: axum::http::Request<axum::body::Body>, next: axum::middleware::Next) -> axum::response::Response {
+            let trace_id = Uuid::new_v4();
+            // Attach trace_id to request extensions for later retrieval
+            let mut req = req;
+            req.extensions_mut().insert(trace_id);
+            next.run(req).await
+        }
+
         let router = Router::new()
             .route("/signup", post(routes::signup::signup))
-            .route("/login", post(routes::auth::dummy_handler))
-            .route("/logout", post(routes::auth::dummy_handler))
-            .route("/verify-2fa", post(routes::verify_2fa))
-            .route("/verify-token", post(routes::auth::dummy_handler))
+            .route("/login", post(routes::login::login))
+            .route("/logout", post(routes::logout::logout))
+            .route("/verify-2fa", post(routes::verify_2fa::verify_2fa))
+            .route("/verify-token", post(routes::verify_token::verify_token))
             .route("/health", axum::routing::get(routes::signup::health))
             .route("/openapi.json", get(|| async move { openapi_json }))
             .fallback_service(ServeDir::new("assets"))
-            .with_state(app_state);
+            .with_state(app_state)
+            .layer(from_fn(add_trace_id))
+            .layer(CatchPanicLayer::new())
+            .layer(TraceLayer::new_for_http());
 
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();

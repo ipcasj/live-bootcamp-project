@@ -1,3 +1,6 @@
 pub mod auth;
 pub mod signup;
-pub use signup::verify_2fa;
+pub mod login;
+pub mod logout;
+pub mod verify_2fa;
+pub mod verify_token;

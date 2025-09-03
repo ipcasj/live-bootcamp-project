@@ -59,7 +59,7 @@ mod tests {
 
     #[quickcheck]
     fn property_based_invalid_emails_are_rejected(s: String) {
-        if !validate_email(&s) {
+        if !s.validate_email() {
             assert!(Email::parse(&s).is_err());
         }
     }

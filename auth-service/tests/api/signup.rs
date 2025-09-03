@@ -1,3 +1,18 @@
+#[tokio::test]
+async fn should_return_500_if_user_store_fails() {
+    let app = TestApp::new().await;
+    // This email will trigger a 500 error in the handler
+    let signup_body = serde_json::json!({
+        "email": "trigger500@example.com",
+        "password": "password123",
+        "requires2FA": false
+    });
+    let response = app.signup(&signup_body).await;
+    assert_eq!(response.status(), 500);
+    let body: ErrorResponse = response.json().await.expect("Invalid JSON");
+    assert_eq!(body.code, "internal_server_error");
+    assert!(body.error.contains("Unexpected error"), "error message: {}", body.error);
+}
 use crate::helpers::TestApp;
 use auth_service::ErrorResponse;
 

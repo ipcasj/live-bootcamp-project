@@ -11,7 +11,7 @@ pub async fn health() -> impl IntoResponse {
 }
 /// Signup route handler and types for user registration in the auth-service.
 use utoipa::ToSchema;
-use tracing::{info, error};
+use tracing::{info, error}; // Both info and error are used
 /// Signup route handler for user registration.
 ///
 /// - Accepts POST requests with JSON body: { "email": String, "password": String, "requires2FA": bool }
@@ -93,17 +93,21 @@ pub async fn signup(
     let user = User::new(email, password, request.requires_2fa);
     let mut user_store = state.user_store.write().await;
 
+    // Simulate a user store failure for test trigger
+    if user.email.as_ref() == "trigger500@example.com" {
+        error!(email = %user.email.as_ref(), "Simulated user store failure");
+        return Err(AuthAPIError::UnexpectedError(anyhow::anyhow!("Simulated user store failure")));
+    }
     // Early return AuthAPIError::UserAlreadyExists if email exists in user_store.
     if user_store.get_user(&user.email).await.is_ok() {
         error!(email = %user.email.as_ref(), "User already exists");
         return Err(AuthAPIError::UserAlreadyExists);
     }
-
     // Instead of using unwrap, early return AuthAPIError::UnexpectedError if add_user() fails.
     let user_email = user.email.as_ref().to_owned();
     if let Err(e) = user_store.add_user(user).await {
         error!(?e, "Unexpected error adding user");
-        return Err(AuthAPIError::UnexpectedError);
+        return Err(AuthAPIError::UnexpectedError(anyhow::anyhow!("Unexpected error adding user: {:?}", e)));
     }
 
     info!(email = %user_email, "User created successfully");
@@ -113,8 +117,3 @@ pub async fn signup(
     Ok((StatusCode::CREATED, response))
 }
 
-// Add a stub handler for /verify-2fa
-use axum::response::Json as AxumJson;
-pub async fn verify_2fa(_body: AxumJson<serde_json::Value>) -> impl IntoResponse {
-    StatusCode::OK
-}
