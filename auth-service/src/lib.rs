@@ -1,5 +1,6 @@
 pub mod grpc;
 mod api_doc;
+pub mod utils;
 /// Main library file for the auth-service crate.
 ///
 /// - Defines application state, error handling, and main application struct.

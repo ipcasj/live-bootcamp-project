@@ -40,6 +40,7 @@ jobs:
     - name: Build and test auth-service code
       working-directory: ./auth-service
       run: |
+        export JWT_SECRET=secret
         cargo build --verbose
         cargo test --verbose
 
@@ -114,6 +115,7 @@ jobs:
           if [ ! -f /root/Caddyfile ]; then
             echo "/root/Caddyfile is not a file after move!"; exit 1;
           fi
+          export JWT_SECRET=${{ secrets.JWT_SECRET }}
           export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
           docker compose down || true
           docker compose pull

@@ -1,22 +1,18 @@
-{
-  # Caddyfile for reverse proxying HTTP and HTTPS for both app-service and auth-service
-  # This will serve both HTTP and HTTPS on your public IP
-  # For HTTPS on an IP, Caddy will use a self-signed certificate (browser warning expected)
 
-  :80, :443 {
-    # Proxy /app to app-service
-    handle_path /app/* {
-      reverse_proxy app-service:8000
-    }
-    # Proxy /auth to auth-service
-    handle_path /auth/* {
-      reverse_proxy auth-service:3000
-    }
-    # Optionally, proxy root to app-service
-    handle_path / {
-      reverse_proxy app-service:8000
-    }
-    # Enable automatic HTTP->HTTPS redirect (optional, comment out to allow both)
-    # redir https://{host}{uri} permanent
-  }
+# Caddyfile for reverse proxying HTTP and HTTPS for both app-service and auth-service
+# This will serve both HTTP and HTTPS on your public IP
+# For HTTPS on an IP, Caddy will use a self-signed certificate (browser warning expected)
+
+:80, :443
+handle_path /app/* {
+  reverse_proxy app-service:8000
 }
+handle_path /auth/* {
+  reverse_proxy auth-service:3000
+}
+# Optionally, proxy root to app-service
+handle_path / {
+  reverse_proxy app-service:8000
+}
+# Enable automatic HTTP->HTTPS redirect (optional, comment out to allow both)
+# redir https://{host}{uri} permanent
