@@ -49,6 +49,8 @@ impl IntoResponse for AuthAPIError {
         let (status, error_message) = match &self {
             AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, self.to_string()),
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, self.to_string()),
+            AuthAPIError::MalformedCredentials => (StatusCode::UNPROCESSABLE_ENTITY, self.to_string()),
+            AuthAPIError::IncorrectCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
             AuthAPIError::UnexpectedError(e) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, format!("Unexpected error: {}", e))
             }

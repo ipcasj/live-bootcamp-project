@@ -87,18 +87,19 @@ const loginForm = document.getElementById("login-form");
 const loginButton = document.getElementById("login-form-submit");
 const loginErrAlter = document.getElementById("login-err-alert");
 
-loginButton.addEventListener("click", (e) => {
+loginButton.addEventListener("click", async (e) => {
     e.preventDefault();
 
     const email = loginForm.email.value;
     const password = loginForm.password.value;
+
 
     fetch('/login', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password }),
     }).then(response => {
         if (response.status === 206) {
             TwoFAForm.email.value = email;
@@ -138,19 +139,20 @@ const signupForm = document.getElementById("signup-form");
 const signupButton = document.getElementById("signup-form-submit");
 const signupErrAlter = document.getElementById("signup-err-alert");
 
-signupButton.addEventListener("click", (e) => {
+signupButton.addEventListener("click", async (e) => {
     e.preventDefault();
 
     const email = signupForm.email.value;
     const password = signupForm.password.value;
     const requires2FA = signupForm.twoFA.checked;
 
+
     fetch('/signup', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, requires2FA }),
+    body: JSON.stringify({ email, password, requires2FA }),
     }).then(response => {
         if (response.ok) {
             signupForm.email.value = "";

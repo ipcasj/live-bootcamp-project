@@ -4,13 +4,16 @@ async fn should_return_500_if_internal_error() {
     let response = app.login("trigger500@example.com", "password").await;
     assert_eq!(response.status(), 500);
 }
+
 use crate::helpers::TestApp;
 
 #[tokio::test]
-async fn test_login() {
+async fn should_return_422_if_malformed_credentials() {
+    // Arrange
     let app = TestApp::new().await;
-
-    let response = app.login("test@example.com", "password").await;
-
-    assert_eq!(response.status(), 200);
+    // Malformed: missing password
+    let body = serde_json::json!({ "email": TestApp::get_random_email() });
+    let response = app.post_login(&body).await;
+    // Assert
+    assert_eq!(response.status(), 422);
 }

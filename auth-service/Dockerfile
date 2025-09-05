@@ -2,7 +2,7 @@
 FROM rust:1.85-alpine AS chef
 USER root
 # Add cargo-chef and all build dependencies (openssl-dev, pkgconf, musl-dev)
-RUN apk add --no-cache musl-dev openssl-dev pkgconf && cargo install cargo-chef
+RUN apk add --no-cache musl-dev pkgconf && cargo install cargo-chef
 WORKDIR /app
 
 FROM chef AS planner

@@ -1,18 +1,8 @@
-    pub async fn delete_account(&self, email: &str) -> reqwest::Response {
-        self.http_client
-            .delete(&format!("{}/delete-account", &self.address))
-            .header("x-user-email", email)
-            .send()
-            .await
-            .expect("Failed to execute request")
-    }
-
 use auth_service::{Application, grpc};
 use uuid::Uuid;
 use tonic::transport::Server;
 use std::sync::Arc;
 use tokio::sync::{oneshot, RwLock};
-
 
 pub struct TestApp {
     pub address: String,
@@ -22,13 +12,19 @@ pub struct TestApp {
     grpc_shutdown_guard: Option<oneshot::Sender<()>>,
 }
 
-
 impl TestApp {
+    pub async fn get_root(&self) -> reqwest::Response {
+        self.http_client
+            .get(&format!("{}/", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
     pub async fn new() -> Self {
         use auth_service::app_state::{AppState, UserStoreType};
         use auth_service::services::hashmap_user_store::HashmapUserStore;
         let user_store: UserStoreType = Arc::new(RwLock::new(HashmapUserStore::default()));
-    let app_state = Arc::new(AppState::new(user_store.clone()));
+        let app_state = Arc::new(AppState::new(user_store.clone()));
 
         // REST server
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
@@ -67,21 +63,12 @@ impl TestApp {
         }
     }
 
-    pub async fn get_root(&self) -> reqwest::Response {
-        self.http_client
-        .get(&format!("{}/", &self.address))
-        .send()
-        .await
-        .expect("Failed to execute request")
-    }
-
-    // Implementation for helper functions for all other routes (signup, login, logout, verify-2fa, and verify-token)
-    pub async fn signup<Body>(&self, body: &Body) -> reqwest::Response
+    pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
     where
         Body: serde::Serialize,
     {
         self.http_client
-            .post(&format!("{}/signup", &self.address))
+            .post(&format!("{}/login", &self.address))
             .json(body)
             .send()
             .await
@@ -95,6 +82,18 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request")
+    }
+
+    pub async fn signup<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
+        self.http_client
+            .post(&format!("{}/signup", &self.address))
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
     }
 
     pub async fn logout(&self) -> reqwest::Response {
@@ -123,6 +122,15 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
+    pub async fn delete_account(&self, email: &str) -> reqwest::Response {
+        self.http_client
+            .delete(&format!("{}/delete-account", &self.address))
+            .header("x-user-email", email)
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
+
     pub fn get_random_email() -> String {
         format!("{}@example.com", Uuid::new_v4())
     }
@@ -138,3 +146,4 @@ impl Drop for TestApp {
         }
     }
 }
+// END OF FILE
