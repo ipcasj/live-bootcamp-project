@@ -99,6 +99,8 @@ pub mod services;
 use crate::app_state::AppState;
 use std::sync::Arc;
 use tower_http::services::ServeDir;
+use tower_http::cors::{CorsLayer, Any};
+use axum::http::Method;
 use std::error::Error;
 
 
@@ -129,6 +131,26 @@ impl Application {
             next.run(req).await
         }
 
+        // --- CORS dynamic origins ---
+        let allowed_origins_env = std::env::var("CORS_ALLOWED_ORIGINS").unwrap_or_else(|_| "*".to_string());
+        let allowed_origins: Vec<String> = allowed_origins_env
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        let cors = if allowed_origins.contains(&"*".to_string()) {
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+                .allow_headers(Any)
+        } else {
+            let origins = allowed_origins.iter().map(|o| o.parse().unwrap()).collect::<Vec<_>>();
+            CorsLayer::new()
+                .allow_origin(origins)
+                .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+                .allow_headers(Any)
+        };
+
         let router = Router::new()
             .route("/signup", post(routes::signup::signup))
             .route("/login", post(routes::login::login))
@@ -140,6 +162,7 @@ impl Application {
             .route("/openapi.json", get(|| async move { openapi_json }))
             .fallback_service(ServeDir::new("assets"))
             .with_state(app_state.clone())
+            .layer(cors)
             .layer(from_fn(add_trace_id))
             .layer(CatchPanicLayer::new())
             .layer(TraceLayer::new_for_http());
