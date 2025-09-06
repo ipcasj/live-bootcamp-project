@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::{app_state::AppState, domain::{User, AuthAPIError}};
+use std::sync::Arc;
 
 
 #[derive(Deserialize, Validate, ToSchema)]
@@ -65,7 +66,7 @@ pub struct SignupResponse {
 /// Signup endpoint for user registration.
 
 pub async fn signup(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     Json(request): Json<SignupRequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
     // Validate input using validator crate
@@ -105,9 +106,19 @@ pub async fn signup(
     }
     // Instead of using unwrap, early return AuthAPIError::UnexpectedError if add_user() fails.
     let user_email = user.email.as_ref().to_owned();
-    if let Err(e) = user_store.add_user(user).await {
+    if let Err(e) = user_store.add_user(user.clone()).await {
         error!(?e, "Unexpected error adding user");
         return Err(AuthAPIError::UnexpectedError(anyhow::anyhow!("Unexpected error adding user: {:?}", e)));
+    }
+
+    // Debug: print user store state after signup (only if concrete type)
+    if let Some(hm) = user_store.as_any_mut().downcast_mut::<crate::services::hashmap_user_store::HashmapUserStore>() {
+        println!("[DEBUG] Signup: Added user {}. User store ptr: {:p}. Now contains:", user_email, hm);
+        for k in hm.users.keys() {
+            println!("[DEBUG] - {}", k.as_ref());
+        }
+    } else {
+        println!("[DEBUG] Signup: User store is not a HashmapUserStore");
     }
 
     info!(email = %user_email, "User created successfully");

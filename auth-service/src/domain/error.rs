@@ -11,6 +11,10 @@ pub enum AuthAPIError {
     MalformedCredentials,
     #[error("Incorrect credentials")]
     IncorrectCredentials,
+    #[error("Missing token/cookie")]
+    MissingToken,
+    #[error("Invalid or expired token")]
+    InvalidToken,
     #[error("Unexpected error: {0}")]
     UnexpectedError(AnyError),
 }
@@ -22,6 +26,8 @@ impl AuthAPIError {
             AuthAPIError::InvalidCredentials => "invalid_credentials",
             AuthAPIError::MalformedCredentials => "malformed_credentials",
             AuthAPIError::IncorrectCredentials => "incorrect_credentials",
+            AuthAPIError::MissingToken => "missing_token",
+            AuthAPIError::InvalidToken => "invalid_token",
             AuthAPIError::UnexpectedError(_) => "internal_server_error",
         }
     }

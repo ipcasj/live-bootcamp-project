@@ -1,5 +1,5 @@
 pub mod grpc;
-mod api_doc;
+pub mod api_doc;
 pub mod utils;
 /// Main library file for the auth-service crate.
 ///
@@ -52,6 +52,8 @@ impl IntoResponse for AuthAPIError {
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, self.to_string()),
             AuthAPIError::MalformedCredentials => (StatusCode::UNPROCESSABLE_ENTITY, self.to_string()),
             AuthAPIError::IncorrectCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
+            AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, self.to_string()),
+            AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, self.to_string()),
             AuthAPIError::UnexpectedError(e) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, format!("Unexpected error: {}", e))
             }
@@ -86,10 +88,11 @@ pub mod app_state {
         }
     }
 }
-mod routes;
+pub mod routes;
 pub mod services;
 use axum::{serve::Serve, Router, routing::post};
 use crate::app_state::AppState;
+use std::sync::Arc;
 use tower_http::services::ServeDir;
 use std::error::Error;
 
@@ -102,7 +105,7 @@ pub struct Application {
 }
 
 impl Application {
-    pub async fn build(app_state: AppState, address: &str, shutdown_signal: Option<tokio::sync::oneshot::Receiver<()>>) -> Result<Self, Box<dyn Error>> {
+    pub async fn build(app_state: Arc<AppState>, address: &str, shutdown_signal: Option<tokio::sync::oneshot::Receiver<()>>) -> Result<Self, Box<dyn Error>> {
     use utoipa::OpenApi;
     use axum::routing::get;
     let openapi = crate::api_doc::ApiDoc::openapi();
@@ -131,7 +134,7 @@ impl Application {
             .route("/health", axum::routing::get(routes::signup::health))
             .route("/openapi.json", get(|| async move { openapi_json }))
             .fallback_service(ServeDir::new("assets"))
-            .with_state(app_state)
+            .with_state(app_state.clone())
             .layer(from_fn(add_trace_id))
             .layer(CatchPanicLayer::new())
             .layer(TraceLayer::new_for_http());

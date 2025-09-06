@@ -14,7 +14,7 @@ async fn main() {
     // Initialize tracing subscriber for structured logging
     tracing_subscriber::fmt::init();
     let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(HashmapUserStore::default()));
-    let app_state = AppState::new(user_store);
+    let app_state = std::sync::Arc::new(AppState::new(user_store));
 
     // Set up graceful shutdown signal (Ctrl+C)
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
@@ -24,8 +24,7 @@ async fn main() {
 
     // gRPC server address
     let grpc_addr = "0.0.0.0:50051".parse().unwrap();
-    let grpc_state = std::sync::Arc::new(app_state);
-    let grpc_service = grpc::grpc_service(grpc_state);
+    let grpc_service = grpc::grpc_service(app_state.clone());
 
     // Spawn a task to listen for Ctrl+C
     tokio::spawn(async move {

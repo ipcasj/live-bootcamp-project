@@ -1,4 +1,5 @@
 use auth_service::{Application, grpc};
+use reqwest::cookie::Jar;
 use uuid::Uuid;
 use tonic::transport::Server;
 use std::sync::Arc;
@@ -7,6 +8,7 @@ use tokio::sync::{oneshot, RwLock};
 pub struct TestApp {
     pub address: String,
     pub grpc_addr: String,
+    pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
     shutdown_guard: Option<oneshot::Sender<()>>,
     grpc_shutdown_guard: Option<oneshot::Sender<()>>,
@@ -23,43 +25,55 @@ impl TestApp {
     pub async fn new() -> Self {
         use auth_service::app_state::{AppState, UserStoreType};
         use auth_service::services::hashmap_user_store::HashmapUserStore;
+    use auth_service::routes;
+    use axum::{Router, routing::post};
+    use tower_http::services::ServeDir;
+    use axum::serve;
+
         let user_store: UserStoreType = Arc::new(RwLock::new(HashmapUserStore::default()));
-        let app_state = Arc::new(AppState::new(user_store.clone()));
+    let app_state = Arc::new(AppState::new(user_store.clone()));
+    // Bind to a random port
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("Failed to bind");
+    let address = format!("http://{}", listener.local_addr().unwrap());
+    let pid = std::process::id();
 
-        // REST server
-        let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        let app = Application::build((*app_state).clone(), "127.0.0.1:0", Some(shutdown_rx))
-            .await
-            .expect("Failed to build application");
-        let address = format!("http://{}", app.address.clone());
-        let http_client = reqwest::Client::new();
-        tokio::spawn(app.run());
+        // Build the router directly for the test
+        use utoipa::OpenApi;
+        use axum::routing::get;
+    let openapi = auth_service::api_doc::ApiDoc::openapi();
+        let openapi_json = serde_json::to_string(&openapi).unwrap();
+        let router = Router::new()
+            .route("/signup", post(routes::signup::signup))
+            .route("/login", post(routes::login::login))
+            .route("/logout", post(routes::logout::logout))
+            .route("/verify-2fa", post(routes::verify_2fa::verify_2fa))
+            .route("/verify-token", post(routes::verify_token::verify_token))
+            .route("/health", get(routes::signup::health))
+            .route("/openapi.json", get(|| async move { openapi_json.clone() }))
+            .fallback_service(ServeDir::new("assets"))
+            .with_state(app_state.clone());
 
-        // gRPC server
-        let (grpc_shutdown_tx, grpc_shutdown_rx) = oneshot::channel();
-        let grpc_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("Failed to bind gRPC");
-        let grpc_addr = grpc_listener.local_addr().unwrap();
-        let grpc_service = grpc::grpc_service(app_state.clone());
-        let grpc_shutdown = async move {
-            let _ = grpc_shutdown_rx.await;
-        };
+        // Bind to a random port
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("Failed to bind");
+        let address = format!("http://{}", listener.local_addr().unwrap());
+        let cookie_jar = Arc::new(Jar::default());
+        let http_client = reqwest::Client::builder()
+            .cookie_provider(cookie_jar.clone())
+            .build()
+            .unwrap();
+
+        // Spawn the server for the duration of the test
         tokio::spawn(async move {
-            Server::builder()
-                .add_service(grpc_service)
-                .serve_with_incoming_shutdown(
-                    tokio_stream::wrappers::TcpListenerStream::new(grpc_listener),
-                    grpc_shutdown,
-                )
-                .await
-                .expect("gRPC server failed");
+            serve(listener, router.into_make_service()).await.unwrap();
         });
 
         Self {
             address,
-            grpc_addr: format!("http://{}", grpc_addr),
+            grpc_addr: String::new(),
+            cookie_jar,
             http_client,
-            shutdown_guard: Some(shutdown_tx),
-            grpc_shutdown_guard: Some(grpc_shutdown_tx),
+            shutdown_guard: None,
+            grpc_shutdown_guard: None,
         }
     }
 

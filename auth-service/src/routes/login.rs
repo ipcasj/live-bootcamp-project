@@ -3,6 +3,7 @@
 use axum::{extract::State, http::{StatusCode, header}, response::{IntoResponse, Response}, Json};
 use axum_extra::extract::cookie::Cookie;
 use crate::app_state::AppState;
+use std::sync::Arc;
 use crate::domain::{AuthAPIError, Email, Password, UserStoreError};
 use crate::utils::auth::generate_auth_cookie;
 use serde::Deserialize;
@@ -16,7 +17,7 @@ struct LoginPayload {
 
 
 pub async fn login(
-	State(state): State<AppState>,
+	State(state): State<Arc<AppState>>,
 	Json(payload): Json<serde_json::Value>,
 ) -> impl IntoResponse {
 	// 422 if missing or malformed fields
@@ -47,6 +48,15 @@ pub async fn login(
 
 	// 401 if credentials valid format but incorrect
 	let user_store = state.user_store.read().await;
+	// Debug: print user store state before login (only if concrete type)
+	if let Some(hm) = user_store.as_any().downcast_ref::<crate::services::hashmap_user_store::HashmapUserStore>() {
+		println!("[DEBUG] Login: Looking for user {}. User store ptr: {:p}. Contains:", email.as_ref(), hm);
+		for k in hm.users.keys() {
+			println!("[DEBUG] - {}", k.as_ref());
+		}
+	} else {
+		println!("[DEBUG] Login: User store is not a HashmapUserStore");
+	}
 	match user_store.validate_user(&email, &password).await {
 		Ok(()) => {
 			// Success: generate JWT cookie and return 200

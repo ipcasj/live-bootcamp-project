@@ -2,13 +2,16 @@
 /// Trait for async user store implementations.
 /// Error type for user store operations.
 use super::{User, Email, Password};
+use std::any::Any;
 
 #[async_trait::async_trait]
-pub trait UserStore: Send + Sync {
+pub trait UserStore: Send + Sync + Any {
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError>;
     async fn get_user(&self, email: &Email) -> Result<User, UserStoreError>;
     async fn validate_user(&self, email: &Email, password: &Password) -> Result<(), UserStoreError>;
     async fn delete_user(&mut self, email: &Email) -> Result<(), UserStoreError>;
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 #[derive(Debug, PartialEq)]

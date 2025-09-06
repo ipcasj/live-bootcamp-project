@@ -13,12 +13,18 @@ use async_trait::async_trait;
 
 #[derive(Default)]
 pub struct HashmapUserStore {
-    users: HashMap<Email, User>,
+    pub users: HashMap<Email, User>,
 }
 
 
 #[async_trait]
 impl UserStore for HashmapUserStore {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
         let key = user.email.clone();
         if self.users.contains_key(&key) {

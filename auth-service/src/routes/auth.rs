@@ -1,5 +1,6 @@
 use axum::{extract::State, response::IntoResponse, Json};
 use crate::{app_state::AppState, domain::{AuthAPIError}, ErrorResponse};
+use std::sync::Arc;
 use crate::auth_middleware::AuthenticatedUser;
 
 #[derive(serde::Serialize, utoipa::ToSchema)]
@@ -19,7 +20,7 @@ pub struct DeleteAccountResponse {
 	tag = "auth"
 )]
 pub async fn delete_account(
-	State(state): State<AppState>,
+	State(state): State<Arc<AppState>>,
 	user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, AuthAPIError> {
 	let mut user_store = state.user_store.write().await;

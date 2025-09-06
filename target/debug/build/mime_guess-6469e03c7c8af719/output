@@ -1,0 +1,1 @@
+cargo:rustc-env=MIME_TYPES_GENERATED_PATH=/Users/igor/rust_projects/lgr/live-bootcamp-project/target/debug/build/mime_guess-6469e03c7c8af719/out/mime_types_generated.rs
