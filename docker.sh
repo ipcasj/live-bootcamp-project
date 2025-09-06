@@ -13,11 +13,11 @@ fi
 while IFS= read -r line; do
   # Skip blank lines and lines starting with #
   if [[ -n "$line" ]] && [[ "$line" != \#* ]]; then
-    # Split the line into key and value
-    key=$(echo "$line" | cut -d '=' -f1)
-    value=$(echo "$line" | cut -d '=' -f2-)
-    # Export the variable
-    export "$key=$value"
+  # Split the line into key and value
+  key=$(echo "$line" | cut -d '=' -f1)
+  value=$(echo "$line" | cut -d '=' -f2-)
+  # Export the variable (fix: use export key="value")
+  export "$key"="$value"
   fi
 # Only process non-comment lines
   done < <(grep -v '^#' "$ENV_FILE")
