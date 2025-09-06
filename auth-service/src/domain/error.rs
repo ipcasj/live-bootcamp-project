@@ -15,6 +15,8 @@ pub enum AuthAPIError {
     MissingToken,
     #[error("Invalid or expired token")]
     InvalidToken,
+    #[error("Token has been banned (revoked)")]
+    BannedToken,
     #[error("Unexpected error: {0}")]
     UnexpectedError(AnyError),
 }
@@ -28,6 +30,7 @@ impl AuthAPIError {
             AuthAPIError::IncorrectCredentials => "incorrect_credentials",
             AuthAPIError::MissingToken => "missing_token",
             AuthAPIError::InvalidToken => "invalid_token",
+            AuthAPIError::BannedToken => "banned_token",
             AuthAPIError::UnexpectedError(_) => "internal_server_error",
         }
     }

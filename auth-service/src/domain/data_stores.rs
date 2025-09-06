@@ -1,4 +1,11 @@
-//! Data store abstractions and errors for user storage in the auth-service.
+use async_trait::async_trait;
+
+#[async_trait]
+pub trait BannedTokenStore: Send + Sync {
+    async fn ban_token(&self, token: String);
+    async fn is_banned(&self, token: &str) -> bool;
+}
+// Data store abstractions and errors for user storage in the auth-service.
 /// Trait for async user store implementations.
 /// Error type for user store operations.
 use super::{User, Email, Password};

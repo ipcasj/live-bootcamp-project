@@ -57,13 +57,23 @@ fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
 }
 
 // Check if JWT auth token is valid by decoding it using the JWT secret
-pub async fn validate_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+use crate::domain::data_stores::BannedTokenStore;
+use std::sync::Arc;
+use crate::domain::AuthAPIError;
+
+pub async fn validate_token(token: &str, banned_token_store: Option<Arc<dyn BannedTokenStore>>) -> Result<Claims, AuthAPIError> {
+    if let Some(store) = banned_token_store {
+        if store.is_banned(token).await {
+            return Err(AuthAPIError::BannedToken);
+        }
+    }
     decode::<Claims>(
         token,
         &DecodingKey::from_secret(JWT_SECRET.as_bytes()),
         &Validation::default(),
     )
     .map(|data| data.claims)
+    .map_err(|_| AuthAPIError::InvalidToken)
 }
 
 // Create JWT auth token by encoding claims using the JWT secret
@@ -118,7 +128,7 @@ mod tests {
     async fn test_validate_token_with_valid_token() {
     let email = Email::parse("test@example.com").unwrap();
         let token = generate_auth_token(&email).unwrap();
-        let result = validate_token(&token).await.unwrap();
+    let result = validate_token(&token, None).await.unwrap();
         assert_eq!(result.sub, "test@example.com");
 
         let exp = Utc::now()
@@ -132,7 +142,7 @@ mod tests {
     #[tokio::test]
     async fn test_validate_token_with_invalid_token() {
         let token = "invalid_token".to_owned();
-        let result = validate_token(&token).await;
+    let result = validate_token(&token, None).await;
         assert!(result.is_err());
     }
 }

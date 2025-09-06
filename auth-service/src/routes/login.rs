@@ -1,15 +1,16 @@
 
 
-use axum::{extract::State, http::{StatusCode, header}, response::{IntoResponse, Response}, Json};
-use axum_extra::extract::cookie::Cookie;
+use axum::{extract::State, http::{StatusCode, header}, response::IntoResponse, Json};
+// use axum_extra::extract::cookie::Cookie; // unused
 use crate::app_state::AppState;
 use std::sync::Arc;
 use crate::domain::{AuthAPIError, Email, Password, UserStoreError};
 use crate::utils::auth::generate_auth_cookie;
 use serde::Deserialize;
-use anyhow::anyhow;
+// use anyhow::anyhow; // unused
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct LoginPayload {
 	email: String,
 	password: String,

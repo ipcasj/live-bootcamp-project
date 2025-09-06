@@ -1,4 +1,5 @@
-use reqwest::cookie::CookieStore;
+use auth_service::domain::data_stores::BannedTokenStore;
+// use reqwest::cookie::CookieStore; // unused
 #[tokio::test]
 async fn should_return_500_if_internal_error() {
     let app = TestApp::new().await;
@@ -41,18 +42,17 @@ async fn logout_should_clear_cookie_on_success() {
         "requires2FA": false
     })).await;
     let login_response = app.login("user@example.com", "password").await;
-    // Debug: print Set-Cookie header from login response
-    if let Some(set_cookie) = login_response.headers().get("set-cookie") {
-        println!("Set-Cookie from login: {}", set_cookie.to_str().unwrap_or("<invalid>"));
-    } else {
-        println!("No Set-Cookie header in login response");
-    }
+    // Extract token from Set-Cookie
+    let set_cookie = login_response.headers().get("set-cookie").expect("No set-cookie header").to_str().unwrap();
+    let token = set_cookie.split(';').find(|s| s.trim_start().starts_with("jwt=")).unwrap().trim_start_matches("jwt=");
     // Now logout
     let response = app.logout().await;
     assert_eq!(response.status(), 200);
     // Check that the Set-Cookie header clears the cookie
     let cookies: Vec<_> = response.headers().get_all("set-cookie").iter().collect();
     assert!(cookies.iter().any(|c| c.to_str().unwrap().contains("jwt=;")));
+    // Check that the token is banned
+    assert!(app.banned_token_store.is_banned(token).await);
 }
 
 #[tokio::test]

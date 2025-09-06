@@ -1,3 +1,4 @@
+use auth_service::utils::constants::JWT_COOKIE_NAME;
 #[tokio::test]
 async fn should_return_500_if_internal_error() {
     let app = TestApp::new().await;
@@ -7,7 +8,7 @@ async fn should_return_500_if_internal_error() {
 
 use crate::helpers::TestApp;
 
-use auth_service::{utils::constants::JWT_COOKIE_NAME, ErrorResponse};
+// use auth_service::{utils::constants::JWT_COOKIE_NAME, ErrorResponse}; // unused
 
 #[tokio::test]
 async fn should_return_422_if_malformed_credentials() {

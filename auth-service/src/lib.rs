@@ -54,6 +54,7 @@ impl IntoResponse for AuthAPIError {
             AuthAPIError::IncorrectCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
             AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, self.to_string()),
             AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, self.to_string()),
+            AuthAPIError::BannedToken => (StatusCode::UNAUTHORIZED, self.to_string()),
             AuthAPIError::UnexpectedError(e) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, format!("Unexpected error: {}", e))
             }
@@ -68,7 +69,7 @@ impl IntoResponse for AuthAPIError {
         (status, body).into_response()
     }
 }
-mod domain;
+// mod domain; // removed duplicate, now public below
 mod auth_middleware;
 pub mod app_state {
     use std::sync::Arc;
@@ -77,20 +78,24 @@ pub mod app_state {
 
     pub type UserStoreType = Arc<RwLock<dyn UserStore + Send + Sync>>;
 
+    use crate::domain::data_stores::BannedTokenStore;
     #[derive(Clone)]
     pub struct AppState {
         pub user_store: UserStoreType,
+        pub banned_token_store: Arc<dyn BannedTokenStore>,
     }
 
     impl AppState {
-        pub fn new(user_store: UserStoreType) -> Self {
-            Self { user_store }
+        pub fn new(user_store: UserStoreType, banned_token_store: Arc<dyn BannedTokenStore>) -> Self {
+            Self { user_store, banned_token_store }
         }
     }
 }
+// pub mod services; // removed duplicate, now public below
+use axum::{serve::Serve, Router, routing::post};
+pub mod domain;
 pub mod routes;
 pub mod services;
-use axum::{serve::Serve, Router, routing::post};
 use crate::app_state::AppState;
 use std::sync::Arc;
 use tower_http::services::ServeDir;

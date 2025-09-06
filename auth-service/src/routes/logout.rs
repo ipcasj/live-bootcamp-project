@@ -1,4 +1,4 @@
-use axum::{http::{StatusCode, header}, response::{IntoResponse, Response}, extract::State};
+use axum::{http::{StatusCode, header}, response::IntoResponse, extract::State};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use time::Duration;
 use crate::domain::AuthAPIError;
@@ -10,7 +10,7 @@ use std::sync::Arc;
 /// Contract-compliant logout route: clears JWT cookie, returns 400/401/200 as required.
 pub async fn logout(
 	jar: CookieJar,
-	State(_state): State<Arc<AppState>>,
+	State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
 	// 400: No cookie present
 	let jwt_cookie = jar.get(JWT_COOKIE_NAME);
@@ -25,17 +25,19 @@ pub async fn logout(
 		return Err(AuthAPIError::UnexpectedError(anyhow::anyhow!("triggered 500 by token")));
 	}
 
-	// 401: Invalid/expired token
-	match validate_token(token).await {
+	// 401: Invalid/expired token or banned
+	match validate_token(token, Some(state.banned_token_store.clone())).await {
 		Ok(_) => {
+			// Ban the token on logout
+			state.banned_token_store.ban_token(token.to_string()).await;
 			// 200: Success, clear cookie
 			let expired = Cookie::build((JWT_COOKIE_NAME, ""))
 				.path("/")
 				.http_only(true)
 				.max_age(Duration::seconds(0))
-				.finish();
+				.build();
 			Ok((StatusCode::OK, [(header::SET_COOKIE, expired.to_string())]))
 		}
-		Err(_) => Err(AuthAPIError::InvalidToken), // 401
+		Err(e) => Err(e), // 401/403
 	}
 }

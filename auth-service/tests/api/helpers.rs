@@ -1,15 +1,17 @@
-use auth_service::{Application, grpc};
+// use auth_service::{Application, grpc}; // unused
 use reqwest::cookie::Jar;
 use uuid::Uuid;
-use tonic::transport::Server;
+// use tonic::transport::Server; // unused
 use std::sync::Arc;
 use tokio::sync::{oneshot, RwLock};
 
+// use auth_service::domain::data_stores::BannedTokenStore; // unused
+use auth_service::services::hashset_banned_token_store::HashsetBannedTokenStore;
 pub struct TestApp {
     pub address: String,
-    pub grpc_addr: String,
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
+    pub banned_token_store: Arc<HashsetBannedTokenStore>,
     shutdown_guard: Option<oneshot::Sender<()>>,
     grpc_shutdown_guard: Option<oneshot::Sender<()>>,
 }
@@ -36,22 +38,19 @@ impl TestApp {
     pub async fn new() -> Self {
         use auth_service::app_state::{AppState, UserStoreType};
         use auth_service::services::hashmap_user_store::HashmapUserStore;
-    use auth_service::routes;
-    use axum::{Router, routing::post};
-    use tower_http::services::ServeDir;
-    use axum::serve;
+        use auth_service::routes;
+        use axum::{Router, routing::post};
+        use tower_http::services::ServeDir;
+        use axum::serve;
 
         let user_store: UserStoreType = Arc::new(RwLock::new(HashmapUserStore::default()));
-    let app_state = Arc::new(AppState::new(user_store.clone()));
-    // Bind to a random port
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("Failed to bind");
-    let address = format!("http://{}", listener.local_addr().unwrap());
-    let pid = std::process::id();
+        let banned_token_store = Arc::new(HashsetBannedTokenStore::default());
+        let app_state = Arc::new(AppState::new(user_store.clone(), banned_token_store.clone()));
 
         // Build the router directly for the test
         use utoipa::OpenApi;
         use axum::routing::get;
-    let openapi = auth_service::api_doc::ApiDoc::openapi();
+        let openapi = auth_service::api_doc::ApiDoc::openapi();
         let openapi_json = serde_json::to_string(&openapi).unwrap();
         let router = Router::new()
             .route("/signup", post(routes::signup::signup))
@@ -80,9 +79,9 @@ impl TestApp {
 
         Self {
             address,
-            grpc_addr: String::new(),
             cookie_jar,
             http_client,
+            banned_token_store,
             shutdown_guard: None,
             grpc_shutdown_guard: None,
         }
@@ -138,23 +137,6 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
-    pub async fn verify_token(&self, token: &str) -> reqwest::Response {
-        self.http_client
-            .post(&format!("{}/verify-token", &self.address))
-            .json(&serde_json::json!({ "token": token }))
-            .send()
-            .await
-            .expect("Failed to execute request")
-    }
-
-    pub async fn delete_account(&self, email: &str) -> reqwest::Response {
-        self.http_client
-            .delete(&format!("{}/delete-account", &self.address))
-            .header("x-user-email", email)
-            .send()
-            .await
-            .expect("Failed to execute request")
-    }
 
     pub fn get_random_email() -> String {
         format!("{}@example.com", Uuid::new_v4())

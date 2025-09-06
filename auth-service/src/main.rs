@@ -13,8 +13,10 @@ use tonic::transport::Server;
 async fn main() {
     // Initialize tracing subscriber for structured logging
     tracing_subscriber::fmt::init();
+    use auth_service::services::hashset_banned_token_store::HashsetBannedTokenStore;
     let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(HashmapUserStore::default()));
-    let app_state = std::sync::Arc::new(AppState::new(user_store));
+    let banned_token_store = std::sync::Arc::new(HashsetBannedTokenStore::default());
+    let app_state = std::sync::Arc::new(AppState::new(user_store, banned_token_store));
 
     // Set up graceful shutdown signal (Ctrl+C)
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
