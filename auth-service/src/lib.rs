@@ -157,6 +157,7 @@ impl Application {
             .route("/logout", post(routes::logout::logout))
             .route("/verify-2fa", post(routes::verify_2fa::verify_2fa))
             .route("/verify-token", post(routes::verify_token::verify_token))
+            .route("/refresh-token", post(routes::refresh_token::refresh_token))
             .route("/delete-account", axum::routing::delete(routes::auth::delete_account))
             .route("/health", axum::routing::get(routes::signup::health))
             .route("/openapi.json", get(|| async move { openapi_json }))

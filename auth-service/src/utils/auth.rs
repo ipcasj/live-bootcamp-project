@@ -5,7 +5,44 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::email::Email;
 
-use super::constants::{JWT_COOKIE_NAME, JWT_SECRET};
+use super::constants::{JWT_COOKIE_NAME, JWT_SECRET, REFRESH_TOKEN_SECRET, REFRESH_TOKEN_TTL_SECONDS};
+// Create refresh token
+pub fn generate_refresh_token(email: &Email) -> Result<String, GenerateTokenError> {
+    let delta = chrono::Duration::try_seconds(REFRESH_TOKEN_TTL_SECONDS)
+        .ok_or(GenerateTokenError::UnexpectedError)?;
+    let exp = Utc::now()
+        .checked_add_signed(delta)
+        .ok_or(GenerateTokenError::UnexpectedError)?
+        .timestamp();
+    let exp: usize = exp.try_into().map_err(|_| GenerateTokenError::UnexpectedError)?;
+    let sub = email.as_ref().to_owned();
+    let claims = Claims { sub, exp };
+    encode(
+        &jsonwebtoken::Header::default(),
+        &claims,
+        &EncodingKey::from_secret(REFRESH_TOKEN_SECRET.as_bytes()),
+    ).map_err(GenerateTokenError::TokenError)
+}
+
+pub fn generate_refresh_token_from_str(email: &str) -> Result<String, GenerateTokenError> {
+    let email = Email::parse(email).map_err(|_| GenerateTokenError::UnexpectedError)?;
+    generate_refresh_token(&email)
+}
+
+pub async fn validate_refresh_token(token: &str, banned_token_store: Option<Arc<dyn BannedTokenStore>>) -> Result<Claims, AuthAPIError> {
+    if let Some(store) = banned_token_store {
+        if store.is_banned(token).await {
+            return Err(AuthAPIError::BannedToken);
+        }
+    }
+    decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(REFRESH_TOKEN_SECRET.as_bytes()),
+        &Validation::default(),
+    )
+    .map(|data| data.claims)
+    .map_err(|_| AuthAPIError::InvalidToken)
+}
 
 // Create cookie with a new JWT auth token
 pub fn generate_auth_cookie(email: &Email) -> Result<Cookie<'static>, GenerateTokenError> {
@@ -54,6 +91,12 @@ fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
     let claims = Claims { sub, exp };
 
     create_token(&claims).map_err(GenerateTokenError::TokenError)
+}
+
+// Helper to generate auth token from a string email (for refresh_token)
+pub fn generate_auth_token_from_str(email: &str) -> Result<String, GenerateTokenError> {
+    let email = Email::parse(email).map_err(|_| GenerateTokenError::UnexpectedError)?;
+    generate_auth_token(&email)
 }
 
 // Check if JWT auth token is valid by decoding it using the JWT secret
