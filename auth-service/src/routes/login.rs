@@ -75,7 +75,11 @@ pub async fn login(
 		if let Err(_) = TwoFACodeStore::add_code(&mut *state.two_fa_code_store.write().await, email.clone(), login_attempt_id.clone(), two_fa_code.clone()).await {
 			return AuthAPIError::UnexpectedError(anyhow::anyhow!("Failed to store 2FA code")).into_response();
 		}
-		// (Send code to user here...)
+		// Send code to user via email client
+		if let Err(e) = state.email_client.send_2fa_code(email.as_ref(), two_fa_code.as_ref()).await {
+			tracing::error!(?e, "Failed to send 2FA code via email client");
+			return AuthAPIError::UnexpectedError(anyhow::anyhow!("Failed to send 2FA code")).into_response();
+		}
 		let response = TwoFactorAuthResponse {
 			message: "2FA required".to_owned(),
 			login_attempt_id: login_attempt_id.as_ref().to_owned(),

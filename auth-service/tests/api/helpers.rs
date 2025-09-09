@@ -48,7 +48,9 @@ impl TestApp {
         let user_store: UserStoreType = Arc::new(RwLock::new(HashmapUserStore::default()));
         let banned_token_store = Arc::new(HashsetBannedTokenStore::default());
         let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
-        let app_state = Arc::new(AppState::new(user_store.clone(), banned_token_store.clone(), two_fa_code_store.clone()));
+    use auth_service::services::mock_email_client::MockEmailClient;
+    let email_client = Arc::new(MockEmailClient);
+    let app_state = Arc::new(AppState::new(user_store.clone(), banned_token_store.clone(), two_fa_code_store.clone(), email_client));
 
         // Build the router directly for the test
         use utoipa::OpenApi;

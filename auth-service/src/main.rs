@@ -18,7 +18,9 @@ async fn main() {
     let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(HashmapUserStore::default()));
     let banned_token_store = std::sync::Arc::new(HashsetBannedTokenStore::default());
     let two_fa_code_store = default_two_fa_code_store();
-    let app_state = std::sync::Arc::new(AppState::new(user_store, banned_token_store, two_fa_code_store));
+    use auth_service::services::mock_email_client::MockEmailClient;
+    let email_client = std::sync::Arc::new(MockEmailClient);
+    let app_state = std::sync::Arc::new(AppState::new(user_store, banned_token_store, two_fa_code_store, email_client));
 
     // Set up graceful shutdown signal (Ctrl+C)
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
