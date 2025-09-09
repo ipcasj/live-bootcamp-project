@@ -1,7 +1,7 @@
 //! In-memory HashMap-based user store implementation for the auth-service.
 /// In-memory user store using a HashMap.
 use std::collections::HashMap;
-use crate::domain::{Email, Password};
+use crate::domain::Email;
 
 use crate::domain::{User, UserStore, UserStoreError};
 use async_trait::async_trait;
@@ -39,9 +39,9 @@ impl UserStore for HashmapUserStore {
         self.users.get(email).cloned().ok_or(UserStoreError::UserNotFound)
     }
 
-    async fn validate_user(&self, email: &Email, password: &Password) -> Result<(), UserStoreError> {
+    async fn validate_user(&self, email: &Email, password: &str) -> Result<(), UserStoreError> {
         match self.users.get(email) {
-            Some(user) if &user.password == password => Ok(()),
+            Some(user) if user.password.verify(password) => Ok(()),
             Some(_) => Err(UserStoreError::InvalidCredentials),
             None => Err(UserStoreError::UserNotFound),
         }
@@ -95,11 +95,13 @@ mod tests {
     async fn test_validate_user() {
         let mut store = HashmapUserStore::default();
         let email = crate::domain::Email::parse("test@example.com").unwrap();
-        let password = crate::domain::Password::parse("password").unwrap();
-        let user = User::new(email.clone(), password.clone(), false);
+        let password_plain = "password";
+        let password = crate::domain::Password::parse(password_plain).unwrap();
+        let user = User::new(email.clone(), password, false);
         store.add_user(user).await.unwrap();
-        assert_eq!(store.validate_user(&email, &password).await, Ok(()));
-        let wrong_password = crate::domain::Password::parse("wrongpassword").unwrap();
-        assert_eq!(store.validate_user(&email, &wrong_password).await, Err(UserStoreError::InvalidCredentials));
+        // Validate with correct password
+        assert_eq!(store.validate_user(&email, password_plain).await, Ok(()));
+        // Validate with wrong password
+    assert_eq!(store.validate_user(&email, "wrongpassword").await, Err(UserStoreError::InvalidCredentials));
     }
 }

@@ -12,6 +12,7 @@ pub struct TestApp {
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
     pub banned_token_store: Arc<HashsetBannedTokenStore>,
+    pub two_fa_code_store: Arc<tokio::sync::RwLock<auth_service::services::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
     shutdown_guard: Option<oneshot::Sender<()>>,
     grpc_shutdown_guard: Option<oneshot::Sender<()>>,
 }
@@ -38,6 +39,7 @@ impl TestApp {
     pub async fn new() -> Self {
         use auth_service::app_state::{AppState, UserStoreType};
         use auth_service::services::hashmap_user_store::HashmapUserStore;
+        use auth_service::services::hashmap_two_fa_code_store::HashmapTwoFACodeStore;
         use auth_service::routes;
         use axum::{Router, routing::post};
         use tower_http::services::ServeDir;
@@ -45,7 +47,8 @@ impl TestApp {
 
         let user_store: UserStoreType = Arc::new(RwLock::new(HashmapUserStore::default()));
         let banned_token_store = Arc::new(HashsetBannedTokenStore::default());
-        let app_state = Arc::new(AppState::new(user_store.clone(), banned_token_store.clone()));
+        let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
+        let app_state = Arc::new(AppState::new(user_store.clone(), banned_token_store.clone(), two_fa_code_store.clone()));
 
         // Build the router directly for the test
         use utoipa::OpenApi;
@@ -82,6 +85,7 @@ impl TestApp {
             cookie_jar,
             http_client,
             banned_token_store,
+            two_fa_code_store,
             shutdown_guard: None,
             grpc_shutdown_guard: None,
         }
@@ -108,13 +112,15 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
-    pub async fn signup<Body>(&self, body: &Body) -> reqwest::Response
-    where
-        Body: serde::Serialize,
-    {
+    pub async fn signup(&self, email: &str, password: &str, requires_2fa: bool) -> reqwest::Response {
+        let body = serde_json::json!({
+            "email": email,
+            "password": password,
+            "requires2FA": requires_2fa
+        });
         self.http_client
             .post(&format!("{}/signup", &self.address))
-            .json(body)
+            .json(&body)
             .send()
             .await
             .expect("Failed to execute request.")

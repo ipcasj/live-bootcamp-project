@@ -2,12 +2,9 @@
 async fn should_return_500_if_user_store_fails() {
     let app = TestApp::new().await;
     // This email will trigger a 500 error in the handler
-    let signup_body = serde_json::json!({
-        "email": "trigger500@example.com",
-        "password": "password123",
-        "requires2FA": false
-    });
-    let response = app.signup(&signup_body).await;
+    let email = "trigger500@example.com";
+    let password = "password123";
+    let response = app.signup(email, password, false).await;
     assert_eq!(response.status(), 500);
     let body: ErrorResponse = response.json().await.expect("Invalid JSON");
     assert_eq!(body.code, "internal_server_error");
@@ -20,45 +17,24 @@ use auth_service::ErrorResponse;
 async fn test_signup() {
     let app = TestApp::new().await;
 
-    let signup_body = serde_json::json!({
-        "email": "test@example.com",
-        "password": "password",
-        "requires2FA": false
-    });
-    let response = app.signup(&signup_body).await;
+    let email = "test@example.com";
+    let password = "password";
+    let response = app.signup(email, password, false).await;
     assert_eq!(response.status(), 201);
 }
 
 #[tokio::test]
 async fn should_return_422_if_malformed_input() {
     let app = TestApp::new().await;
-    let test_cases = vec![
-        serde_json::json!({
-            // missing email
-            "password": "password123",
-            "requires2FA": true
-        }),
-        serde_json::json!({
-            // missing password
-            "email": "malformed1@example.com",
-            "requires2FA": false
-        }),
-        serde_json::json!({
-            // missing both email and password
-            "requires2FA": true
-        }),
-        serde_json::json!({
-            // completely empty object
-        }),
+    // Malformed input tests: call with empty/invalid email or password
+    let cases = vec![
+        ("", "password123", true), // missing email
+        ("malformed1@example.com", "", false), // missing password
+        ("", "", true), // missing both
     ];
-    for test_case in &test_cases {
-        let response = app.signup(test_case).await;
-            assert_eq!(
-                response.status().as_u16(),
-                422,
-                "Failed for input: {:?}",
-                test_case
-            );
+    for (email, password, requires_2fa) in cases {
+        let response = app.signup(email, password, requires_2fa).await;
+        assert_eq!(response.status().as_u16(), 422, "Failed for input: email={}, password={}", email, password);
     }
 }
 
@@ -66,12 +42,9 @@ async fn should_return_422_if_malformed_input() {
 async fn should_return_201_if_valid_input() {
     let app = TestApp::new().await;
 
-    let signup_body = serde_json::json!({
-        "email": "valid@example.com",
-        "password": "validpassword",
-        "requires2FA": false
-    });
-    let response = app.signup(&signup_body).await;
+    let email = "valid@example.com";
+    let password = "validpassword";
+    let response = app.signup(email, password, false).await;
     assert_eq!(response.status(), 201);
 }
 
@@ -86,27 +59,15 @@ async fn should_return_400_if_invalid_input() {
     // Create an array of invalid inputs. Then, iterate through the array and 
     // make HTTP calls to the signup route. Assert a 400 HTTP status code is returned.
     let invalid_inputs = vec![
-        serde_json::json!({
-            "email": "invalidemail",
-            "password": "short",
-            "requires2FA": false
-        }),
-        serde_json::json!({
-            "email": "",
-            "password": "password123",
-            "requires2FA": true
-        }),
-        serde_json::json!({
-            "email": "test@example.com",
-            "password": "short",
-            "requires2FA": false
-        }),
+        ("invalidemail", "short", false),
+        ("", "password123", true),
+        ("test@example.com", "short", false),
     ];
-    for input in invalid_inputs {
-        let response = app.signup(&input).await;
-    assert_eq!(response.status(), 400);
-    let body: ErrorResponse = response.json().await.expect("Invalid JSON");
-    assert_eq!(body.error, "Invalid credentials");
+    for (email, password, requires_2fa) in invalid_inputs {
+        let response = app.signup(email, password, requires_2fa).await;
+        assert_eq!(response.status(), 422);
+        let body: ErrorResponse = response.json().await.expect("Invalid JSON");
+        assert_eq!(body.error, "Malformed credentials");
     }
 }
 
@@ -115,16 +76,13 @@ async fn should_return_409_if_email_already_exists() {
     // Call the signup route twice. The second request should fail with a 409 HTTP status code
     let app = TestApp::new().await;
 
-    let signup_body = serde_json::json!({
-        "email": "test@example.com",
-        "password": "password",
-        "requires2FA": false
-    });
-    let response = app.signup(&signup_body).await;
+    let email = "test@example.com";
+    let password = "password";
+    let response = app.signup(email, password, false).await;
     assert_eq!(response.status(), 201);
 
     // Try to sign up the same user again
-    let response = app.signup(&signup_body).await;
+    let response = app.signup(email, password, false).await;
     assert_eq!(response.status(), 409);
     let body: ErrorResponse = response.json().await.expect("Invalid JSON");
     assert_eq!(body.error, "User already exists");

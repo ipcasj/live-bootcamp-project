@@ -36,11 +36,7 @@ async fn logout_should_return_401_if_invalid_cookie() {
 async fn logout_should_clear_cookie_on_success() {
     let app = TestApp::new().await;
     // First, signup and login to set a valid cookie
-    let _ = app.signup(&serde_json::json!({
-        "email": "user@example.com",
-        "password": "password",
-        "requires2FA": false
-    })).await;
+    let _ = app.signup("user@example.com", "password", false).await;
     let login_response = app.login("user@example.com", "password").await;
     // Extract token from Set-Cookie
     let set_cookie = login_response.headers().get("set-cookie").expect("No set-cookie header").to_str().unwrap();
@@ -59,11 +55,7 @@ async fn logout_should_clear_cookie_on_success() {
 async fn test_logout() {
     let app = TestApp::new().await;
     // First, signup and login to set a valid cookie
-    let _ = app.signup(&serde_json::json!({
-        "email": "user@example.com",
-        "password": "password",
-        "requires2FA": false
-    })).await;
+    let _ = app.signup("user@example.com", "password", false).await;
     let _ = app.login("user@example.com", "password").await;
     let response = app.logout().await;
     assert_eq!(response.status(), 200);

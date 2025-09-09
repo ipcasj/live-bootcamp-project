@@ -35,6 +35,9 @@ uuid = { version = "1.7.0", features = ["v4", "serde"] }
 thiserror = "2.0.16"
 anyhow = "1.0"
 time = "0.3"
+rand = "0.8.5"
+argon2 = "0.5.3"
+rand_core = "0.9.3"
 
 [dev-dependencies]
 fake = "4.4.0"

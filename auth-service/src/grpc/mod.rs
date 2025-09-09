@@ -60,12 +60,10 @@ impl AuthService for MyAuthService {
             tracing::error!(%trace_id, "Invalid email");
             Status::invalid_argument("Invalid email")
         })?;
-        let password = Password::parse(&req.password).map_err(|_| {
-            tracing::error!(%trace_id, "Invalid password");
-            Status::invalid_argument("Invalid password")
-        })?;
-        let user_store = self.state.user_store.read().await;
-        match user_store.validate_user(&email, &password).await {
+    let password_str = &req.password;
+    // Optionally: validate password length/format here if needed
+    let user_store = self.state.user_store.read().await;
+    match user_store.validate_user(&email, password_str).await {
             Ok(()) => Ok(Response::new(LoginResponse {
                 message: "Login successful".to_string(),
                 token: "dummy-token".to_string(),

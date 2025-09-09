@@ -71,8 +71,9 @@ pub async fn signup(
 ) -> Result<impl IntoResponse, AuthAPIError> {
     // Validate input using validator crate
     if let Err(e) = request.validate() {
-        error!(?e, "Invalid signup credentials");
-        return Err(AuthAPIError::InvalidCredentials);
+        error!(?e, "Malformed signup input");
+        // Return 422 for missing/invalid fields
+        return Err(AuthAPIError::MalformedCredentials);
     }
 
     // Parse and validate email and password using newtypes

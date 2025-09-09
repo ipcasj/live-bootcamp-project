@@ -83,11 +83,16 @@ pub mod app_state {
     pub struct AppState {
         pub user_store: UserStoreType,
         pub banned_token_store: Arc<dyn BannedTokenStore>,
+        pub two_fa_code_store: Arc<tokio::sync::RwLock<crate::services::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
     }
 
     impl AppState {
-        pub fn new(user_store: UserStoreType, banned_token_store: Arc<dyn BannedTokenStore>) -> Self {
-            Self { user_store, banned_token_store }
+        pub fn new(
+            user_store: UserStoreType,
+            banned_token_store: Arc<dyn BannedTokenStore>,
+            two_fa_code_store: Arc<tokio::sync::RwLock<crate::services::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
+        ) -> Self {
+            Self { user_store, banned_token_store, two_fa_code_store }
         }
     }
 }

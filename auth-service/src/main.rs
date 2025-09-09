@@ -7,6 +7,7 @@ use auth_service::Application;
 use auth_service::app_state::{AppState, UserStoreType};
 use auth_service::services::hashmap_user_store::HashmapUserStore;
 use auth_service::grpc;
+use auth_service::services::two_fa_code_store_factory::default_two_fa_code_store;
 use tonic::transport::Server;
 
 #[tokio::main]
@@ -16,7 +17,8 @@ async fn main() {
     use auth_service::services::hashset_banned_token_store::HashsetBannedTokenStore;
     let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(HashmapUserStore::default()));
     let banned_token_store = std::sync::Arc::new(HashsetBannedTokenStore::default());
-    let app_state = std::sync::Arc::new(AppState::new(user_store, banned_token_store));
+    let two_fa_code_store = default_two_fa_code_store();
+    let app_state = std::sync::Arc::new(AppState::new(user_store, banned_token_store, two_fa_code_store));
 
     // Set up graceful shutdown signal (Ctrl+C)
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
