@@ -34,8 +34,9 @@ use crate::{app_state::AppState, domain::{User, AuthAPIError}};
 use std::sync::Arc;
 
 
+
 #[derive(Deserialize, Validate, ToSchema)]
-pub struct SignupRequest {
+pub struct SignupRequestRest {
     #[validate(email, length(min = 1))]
     pub email: String,
     #[validate(length(min = 8))]
@@ -44,18 +45,17 @@ pub struct SignupRequest {
     pub requires_2fa: bool,
 }
 
-
 #[derive(Serialize, ToSchema)]
-pub struct SignupResponse {
+pub struct SignupResponseRest {
     pub message: String,
 }
 
 #[utoipa::path(
     post,
     path = "/signup",
-    request_body = SignupRequest,
+    request_body = SignupRequestRest,
     responses(
-        (status = 201, description = "User created", body = SignupResponse),
+        (status = 201, description = "User created", body = SignupResponseRest),
         (status = 400, description = "Invalid credentials", body = ErrorResponse),
         (status = 409, description = "User already exists", body = ErrorResponse),
         (status = 422, description = "Malformed input", body = ErrorResponse),
@@ -67,7 +67,7 @@ pub struct SignupResponse {
 
 pub async fn signup(
     State(state): State<Arc<AppState>>,
-    Json(request): Json<SignupRequest>,
+    Json(request): Json<SignupRequestRest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
     // Validate input using validator crate
     if let Err(e) = request.validate() {
@@ -123,9 +123,11 @@ pub async fn signup(
     }
 
     info!(email = %user_email, "User created successfully");
-    let response = Json(SignupResponse {
+    let response = Json(SignupResponseRest {
         message: "User created successfully!".to_string(),
     });
-    Ok((StatusCode::CREATED, response))
+    let mut res = response.into_response();
+    *res.status_mut() = StatusCode::CREATED;
+    Ok(res)
 }
 

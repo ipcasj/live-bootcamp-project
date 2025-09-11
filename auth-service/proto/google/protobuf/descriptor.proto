@@ -1,0 +1,24 @@
+// Protocol Buffers - Google's data interchange format
+// https://developers.google.com/protocol-buffers/
+//
+// Copyright 2008 Google Inc.  All rights reserved.
+//
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file or at
+// https://developers.google.com/open-source/licenses/bsd
+
+syntax = "proto2";
+package google.protobuf;
+
+option java_package = "com.google.protobuf";
+option java_outer_classname = "DescriptorProtos";
+option csharp_namespace = "Google.Protobuf.Reflection";
+option go_package = "google.golang.org/protobuf/types/descriptorpb";
+option objc_class_prefix = "GPB";
+option cc_enable_arenas = true;
+
+// Only the MessageOptions message and extension mechanism are needed for prost.options.proto
+message MessageOptions {
+	// Extension range for custom options
+	extensions 1000 to max;
+}

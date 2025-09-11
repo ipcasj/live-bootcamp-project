@@ -11,6 +11,17 @@ pub trait TwoFACodeStore {
         &self,
         email: &Email,
     ) -> Result<(LoginAttemptId, TwoFACode), TwoFACodeStoreError>;
+
+    // New: get code with timestamp for expiration
+    async fn get_code_with_meta(
+        &self,
+        email: &Email,
+    ) -> Result<(LoginAttemptId, TwoFACode, u64), TwoFACodeStoreError>;
+
+    // New: failed attempt tracking
+    async fn record_failed_attempt(&mut self, email: &Email);
+    async fn reset_failed_attempts(&mut self, email: &Email);
+    async fn get_failed_attempts(&self, email: &Email) -> u32;
 }
 
 #[derive(Debug, PartialEq)]

@@ -3,7 +3,7 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
     use crate::helpers::TestApp;
     use auth_service::domain::Email;
     use auth_service::domain::data_stores::TwoFACodeStore;
-    use auth_service::routes::login::TwoFactorAuthResponse;
+    use auth_service::routes::login::TwoFactorAuthResponseRest;
 
     let app = TestApp::new().await;
     let email = TestApp::get_random_email();
@@ -17,9 +17,9 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
     assert_eq!(response.status().as_u16(), 206);
 
     let json_body = response
-        .json::<TwoFactorAuthResponse>()
+        .json::<TwoFactorAuthResponseRest>()
         .await
-        .expect("Could not deserialize response body to TwoFactorAuthResponse");
+        .expect("Could not deserialize response body to TwoFactorAuthResponseRest");
 
     assert_eq!(json_body.message, "2FA required".to_owned());
 

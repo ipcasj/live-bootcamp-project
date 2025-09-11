@@ -10,18 +10,19 @@ use axum::{
 use axum_extra::extract::CookieJar;
 use serde::Serialize;
 use tower_http::services::ServeDir;
+use axum::routing::get_service;
+use std::net::TcpListener;
 
 #[tokio::main]
 async fn main() {
     let app = Router::new()
-        .nest_service("/assets", ServeDir::new("assets"))
+    .nest_service("/assets", get_service(ServeDir::new("assets")))
         .route("/", get(root))
         .route("/protected", get(protected));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
-
+    let listener = TcpListener::bind("0.0.0.0:8000").unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, app).await.unwrap();
+    axum::Server::from_tcp(listener).unwrap().serve(app.into_make_service()).await.unwrap();
 }
 
 #[derive(Template)]

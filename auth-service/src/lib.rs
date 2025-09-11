@@ -1,3 +1,7 @@
+use axum::routing::get_service;
+pub mod auth {
+    tonic::include_proto!("auth");
+}
 pub mod grpc;
 pub mod api_doc;
 pub mod utils;
@@ -66,7 +70,16 @@ impl IntoResponse for AuthAPIError {
             error: error_message,
             trace_id: None,
         });
-        (status, body).into_response()
+        // axum 0.6 does not implement IntoResponse for (StatusCode, Json<T>), so do it manually
+        let mut response = status.into_response();
+    // Serialize the inner ErrorResponse, not the Json wrapper
+    let inner = body.0;
+    *response.body_mut() = axum::body::boxed(axum::body::Full::from(serde_json::to_vec(&inner).unwrap()));
+        response.headers_mut().insert(
+            axum::http::header::CONTENT_TYPE,
+            axum::http::HeaderValue::from_static("application/json"),
+        );
+        response
     }
 }
 // mod domain; // removed duplicate, now public below
@@ -99,7 +112,7 @@ pub mod app_state {
     }
 }
 // pub mod services; // removed duplicate, now public below
-use axum::{serve::Serve, Router, routing::post};
+use axum::{Router, routing::post};
 pub mod domain;
 pub mod routes;
 pub mod services;
@@ -107,13 +120,13 @@ use crate::app_state::AppState;
 use std::sync::Arc;
 use tower_http::services::ServeDir;
 use tower_http::cors::{CorsLayer, Any};
-use axum::http::Method;
+use http::Method;
 use std::error::Error;
 
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
-    server: Serve<tokio::net::TcpListener, Router, Router>,
+    server: hyper::Server<hyper::server::conn::AddrIncoming, axum::routing::IntoMakeService<Router>>,
     pub address: String,
     shutdown_signal: Option<tokio::sync::oneshot::Receiver<()>>,
 }
@@ -130,7 +143,7 @@ impl Application {
     use uuid::Uuid;
 
         // Middleware to inject a trace_id into each request span
-    async fn add_trace_id(req: axum::http::Request<axum::body::Body>, next: axum::middleware::Next) -> axum::response::Response {
+    async fn add_trace_id<B>(req: axum::http::Request<B>, next: axum::middleware::Next<B>) -> axum::response::Response {
             let trace_id = Uuid::new_v4();
             // Attach trace_id to request extensions for later retrieval
             let mut req = req;
@@ -168,20 +181,25 @@ impl Application {
             .route("/delete-account", axum::routing::delete(routes::auth::delete_account))
             .route("/health", axum::routing::get(routes::signup::health))
             .route("/openapi.json", get(|| async move { openapi_json }))
-            .fallback_service(ServeDir::new("assets"))
-            .with_state(app_state.clone())
+            .fallback_service(
+                get_service(ServeDir::new("assets"))
+            )
+            .with_state(app_state.clone());
+        let router = router
             .layer(cors)
             .layer(from_fn(add_trace_id))
             .layer(CatchPanicLayer::new())
             .layer(TraceLayer::new_for_http());
 
-        let listener = tokio::net::TcpListener::bind(address).await?;
-        let address = listener.local_addr()?.to_string();
-        let server = axum::serve(listener, router);
+    let std_listener = std::net::TcpListener::bind(address)?;
+    std_listener.set_nonblocking(true)?;
+    let address = std_listener.local_addr()?.to_string();
+    let listener = tokio::net::TcpListener::from_std(std_listener)?;
+    let server = axum::Server::from_tcp(listener.into_std()?)?.serve(router.into_make_service());
     Ok(Application { server, address, shutdown_signal })
     }
 
-    pub async fn run(self) -> Result<(), std::io::Error> {
+    pub async fn run(self) -> Result<(), hyper::Error> {
         println!("listening on {}", &self.address);
     if let Some(shutdown_signal) = self.shutdown_signal {
             self.server.with_graceful_shutdown(async move {

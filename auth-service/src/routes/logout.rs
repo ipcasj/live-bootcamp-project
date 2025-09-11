@@ -1,6 +1,5 @@
 use axum::{http::{StatusCode, header}, response::IntoResponse, extract::State};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
-use time::Duration;
 use crate::domain::AuthAPIError;
 use crate::utils::constants::JWT_COOKIE_NAME;
 use crate::utils::auth::validate_token;
@@ -31,11 +30,10 @@ pub async fn logout(
 			// Ban the token on logout
 			state.banned_token_store.ban_token(token.to_string()).await;
 			// 200: Success, clear cookie
-			let expired = Cookie::build((JWT_COOKIE_NAME, ""))
-				.path("/")
-				.http_only(true)
-				.max_age(Duration::seconds(0))
-				.build();
+			let mut expired = Cookie::new(JWT_COOKIE_NAME, "");
+			expired.set_path("/");
+			expired.set_http_only(true);
+			expired.set_max_age(time::Duration::seconds(0));
 			Ok((StatusCode::OK, [(header::SET_COOKIE, expired.to_string())]))
 		}
 		Err(e) => Err(e), // 401/403

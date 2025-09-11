@@ -6,6 +6,7 @@ pub struct AuthenticatedUser {
     pub email: String,
 }
 
+#[axum::async_trait]
 impl<S> FromRequestParts<S> for AuthenticatedUser
 where
     S: Send + Sync,
@@ -14,7 +15,7 @@ where
 
     async fn from_request_parts(
         parts: &mut Parts,
-    _state: &S,
+        _state: &S,
     ) -> Result<Self, Self::Rejection> {
         // Demo: extract email from header 'x-user-email'. In production, use session/JWT.
         if let Some(email) = parts.headers.get("x-user-email") {

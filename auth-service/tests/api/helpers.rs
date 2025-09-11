@@ -43,7 +43,7 @@ impl TestApp {
         use auth_service::routes;
         use axum::{Router, routing::post};
         use tower_http::services::ServeDir;
-        use axum::serve;
+        use axum::Server;
 
         let user_store: UserStoreType = Arc::new(RwLock::new(HashmapUserStore::default()));
         let banned_token_store = Arc::new(HashsetBannedTokenStore::default());
@@ -63,6 +63,7 @@ impl TestApp {
             .route("/logout", post(routes::logout::logout))
             .route("/verify-2fa", post(routes::verify_2fa::verify_2fa))
             .route("/verify-token", post(routes::verify_token::verify_token))
+            .route("/audit-log", get(|| async { axum::Json(Vec::<serde_json::Value>::new()) }))
             .route("/health", get(routes::signup::health))
             .route("/openapi.json", get(|| async move { openapi_json.clone() }))
             .fallback_service(ServeDir::new("assets"))
@@ -78,8 +79,13 @@ impl TestApp {
             .unwrap();
 
         // Spawn the server for the duration of the test
+        let std_listener = listener.into_std().unwrap();
         tokio::spawn(async move {
-            serve(listener, router.into_make_service()).await.unwrap();
+            Server::from_tcp(std_listener)
+                .unwrap()
+                .serve(router.into_make_service())
+                .await
+                .unwrap();
         });
 
         Self {
@@ -136,13 +142,16 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
-    pub async fn verify_2fa(&self, code: &str) -> reqwest::Response {
+    pub async fn post_verify_2fa<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
         self.http_client
-            .post(&format!("{}/verify-2fa", &self.address))
-            .json(&serde_json::json!({ "code": code }))
+            .post(format!("{}/verify-2fa", &self.address))
+            .json(body)
             .send()
             .await
-            .expect("Failed to execute request")
+            .expect("Failed to execute request.")
     }
 
 

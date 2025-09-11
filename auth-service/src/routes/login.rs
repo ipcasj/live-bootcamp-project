@@ -9,24 +9,40 @@ use crate::domain::data_stores::{LoginAttemptId, TwoFACode};
 use crate::utils::auth::generate_auth_cookie;
 use serde::Serialize;
 use serde::Deserialize;
+use crate::ErrorResponse;
 // use anyhow::anyhow; // unused
 
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TwoFactorAuthResponse {
+
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct TwoFactorAuthResponseRest {
 	pub message: String,
 	#[serde(rename = "loginAttemptId")]
 	pub login_attempt_id: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(untagged)]
-pub enum LoginResponse {
+pub enum LoginResponseRest {
 	RegularAuth,
-	TwoFactorAuth(TwoFactorAuthResponse),
+	TwoFactorAuth(TwoFactorAuthResponseRest),
 }
 
 
+/// Login endpoint for REST API
+#[utoipa::path(
+	post,
+	path = "/login",
+	request_body = inline(serde_json::Value),
+	responses(
+		(status = 200, description = "Login successful", body = LoginResponseRest),
+		(status = 206, description = "2FA required", body = LoginResponseRest),
+		(status = 400, description = "Invalid credentials", body = ErrorResponse),
+		(status = 401, description = "Incorrect credentials", body = ErrorResponse),
+		(status = 422, description = "Malformed credentials", body = ErrorResponse),
+		(status = 500, description = "Unexpected error", body = ErrorResponse)
+	)
+)]
 pub async fn login(
 	State(state): State<Arc<AppState>>,
 	Json(payload): Json<serde_json::Value>,
@@ -80,11 +96,19 @@ pub async fn login(
 			tracing::error!(?e, "Failed to send 2FA code via email client");
 			return AuthAPIError::UnexpectedError(anyhow::anyhow!("Failed to send 2FA code")).into_response();
 		}
-		let response = TwoFactorAuthResponse {
+		let response = TwoFactorAuthResponseRest {
 			message: "2FA required".to_owned(),
 			login_attempt_id: login_attempt_id.as_ref().to_owned(),
 		};
-		return (StatusCode::PARTIAL_CONTENT, Json(LoginResponse::TwoFactorAuth(response))).into_response();
+			// axum 0.6 does not implement IntoResponse for (StatusCode, Json<T>), so do it manually
+			let mut resp = StatusCode::PARTIAL_CONTENT.into_response();
+		// Serialize the inner type, not axum::Json
+		*resp.body_mut() = axum::body::boxed(axum::body::Full::from(serde_json::to_vec(&LoginResponseRest::TwoFactorAuth(response)).unwrap()));
+			resp.headers_mut().insert(
+				axum::http::header::CONTENT_TYPE,
+				axum::http::HeaderValue::from_static("application/json"),
+			);
+			return resp;
 	}
 
 	// No 2FA: proceed as normal

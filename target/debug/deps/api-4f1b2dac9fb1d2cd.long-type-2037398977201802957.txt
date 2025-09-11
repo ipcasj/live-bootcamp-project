@@ -1,0 +1,2 @@
+fn() -> impl std::future::Future<Output = axum::Json<Vec<AuditLogEntry>>> {audit_log_handler}
+fn() -> impl std::future::Future<Output = axum::Json<Vec<AuditLogEntry>>> {audit_log_handler}: Handler<_, _, _>

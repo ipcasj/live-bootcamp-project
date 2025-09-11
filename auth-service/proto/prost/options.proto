@@ -1,0 +1,9 @@
+syntax = "proto3";
+package prost.options;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.MessageOptions {
+  // See https://docs.rs/prost/latest/prost/attr.message.html
+  optional string message_attribute = 51234;
+}

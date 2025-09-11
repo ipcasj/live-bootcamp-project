@@ -52,12 +52,10 @@ pub fn generate_auth_cookie(email: &Email) -> Result<Cookie<'static>, GenerateTo
 
 // Create cookie and set the value to the passed-in token string 
 fn create_auth_cookie(token: String) -> Cookie<'static> {
-    let cookie = Cookie::build((JWT_COOKIE_NAME, token))
-        .path("/")
-        .http_only(true)
-        .same_site(SameSite::Lax)
-        .build();
-
+    let mut cookie = Cookie::new(JWT_COOKIE_NAME, token);
+    cookie.set_path("/");
+    cookie.set_http_only(true);
+    cookie.set_same_site(SameSite::Lax);
     cookie
 }
 
