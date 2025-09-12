@@ -93,6 +93,8 @@ use std::any::Any;
 
 #[async_trait::async_trait]
 pub trait UserStore: Send + Sync + Any {
+    async fn update_user(&mut self, user: User) -> Result<(), UserStoreError>;
+    async fn get_user_settings(&self, email: &Email) -> Result<(bool, crate::domain::user::TwoFAMethod), UserStoreError>;
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError>;
     async fn get_user(&self, email: &Email) -> Result<User, UserStoreError>;
     async fn validate_user(&self, email: &Email, password: &str) -> Result<(), UserStoreError>;

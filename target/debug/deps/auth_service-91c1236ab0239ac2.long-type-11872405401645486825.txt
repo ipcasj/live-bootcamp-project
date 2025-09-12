@@ -1,0 +1,1 @@
+tokio::sync::RwLockWriteGuard<'_, (dyn data_stores::UserStore + Send + Sync + 'static)>

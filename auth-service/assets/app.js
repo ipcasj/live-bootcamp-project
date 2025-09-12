@@ -1,3 +1,145 @@
+// --- Foldable Account Settings ---
+document.addEventListener('DOMContentLoaded', function() {
+    const foldable = document.querySelector('.foldable-settings-container');
+    if (foldable) {
+        foldable.addEventListener('mouseenter', () => {
+            foldable.classList.add('unfolded');
+        });
+        foldable.addEventListener('mouseleave', () => {
+            foldable.classList.remove('unfolded');
+        });
+    }
+});
+// --- 2FA Toggle Logic ---
+const accountSettingsSection = document.getElementById("account-settings-section");
+const settingsForm = document.getElementById("settings-form");
+const twoFAToggle = document.getElementById("2fa-toggle");
+const settingsErrAlert = document.getElementById("settings-err-alert");
+const twoFAStatusBadge = document.getElementById("2fa-status-badge");
+const twoFAMethodRow = document.getElementById("2fa-method-row");
+const twoFAMethodSelect = document.getElementById("2fa-method-select");
+const twoFAMethodSetup = document.getElementById("2fa-method-setup");
+
+let current2FAStatus = false;
+let current2FAMethod = "Email";
+
+function showAccountSettings(currentRequires2FA, method) {
+    accountSettingsSection.style.display = "block";
+    twoFAToggle.checked = !!currentRequires2FA;
+    current2FAStatus = !!currentRequires2FA;
+    current2FAMethod = method || "Email";
+    update2FAStatusBadge();
+    twoFAMethodRow.style.display = current2FAStatus ? "block" : "none";
+    twoFAMethodSelect.value = current2FAMethod;
+    show2FAMethodSetup(current2FAMethod);
+}
+function hideAccountSettings() {
+    accountSettingsSection.style.display = "none";
+}
+function update2FAStatusBadge() {
+    if (!twoFAStatusBadge) return;
+    if (current2FAStatus) {
+        twoFAStatusBadge.className = "badge bg-success ms-2";
+        twoFAStatusBadge.textContent = `2FA: Enabled (${current2FAMethod})`;
+    } else {
+        twoFAStatusBadge.className = "badge bg-secondary ms-2";
+        twoFAStatusBadge.textContent = "2FA: Disabled";
+    }
+}
+function show2FAMethodSetup(method) {
+    if (!twoFAMethodSetup) return;
+    if (!current2FAStatus) {
+        twoFAMethodSetup.style.display = "none";
+        twoFAMethodSetup.innerHTML = "";
+        return;
+    }
+    twoFAMethodSetup.style.display = "block";
+    if (method === "AuthenticatorApp") {
+        twoFAMethodSetup.innerHTML = `<div class='alert alert-info'>Scan the QR code with your authenticator app. <br><span class='text-muted'>(Stub QR code here)</span></div>`;
+    } else if (method === "SMS") {
+        twoFAMethodSetup.innerHTML = `<div class='alert alert-info'>Enter your phone number to receive codes via SMS. <br><span class='text-muted'>(Stub phone input here)</span></div>`;
+    } else {
+        twoFAMethodSetup.innerHTML = "";
+        twoFAMethodSetup.style.display = "none";
+    }
+}
+
+twoFAToggle.addEventListener("change", async (e) => {
+    e.preventDefault();
+    const enable = twoFAToggle.checked;
+    const action = enable ? "enable" : "disable";
+    if (!confirm(`Are you sure you want to ${action} 2FA?`)) {
+        twoFAToggle.checked = !enable;
+        return;
+    }
+    try {
+        const res = await fetch('/account/settings', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(currentUserEmail ? { 'x-user-email': currentUserEmail } : {})
+            },
+            body: JSON.stringify({ requires2FA: enable, twoFAMethod: twoFAMethodSelect.value })
+        });
+        if (res.ok) {
+            settingsErrAlert.style.display = "none";
+            current2FAStatus = enable;
+            update2FAStatusBadge();
+            twoFAMethodRow.style.display = enable ? "block" : "none";
+            // --- Email notification stub ---
+            console.log(`[STUB] Email notification: 2FA has been ${enable ? "enabled" : "disabled"}.`);
+            alert(`2FA has been ${enable ? "enabled" : "disabled"}.`);
+        } else {
+            const data = await res.json();
+            let msg = data && data.error ? data.error : 'Failed to update 2FA setting.';
+            settingsErrAlert.innerHTML = `<span><strong>Error: </strong>${msg}</span>`;
+            settingsErrAlert.style.display = "block";
+            twoFAToggle.checked = !enable;
+        }
+    } catch (err) {
+        settingsErrAlert.innerHTML = `<span><strong>Error: </strong>Network error</span>`;
+        settingsErrAlert.style.display = "block";
+        twoFAToggle.checked = !enable;
+    }
+});
+
+twoFAMethodSelect.addEventListener("change", async (e) => {
+    const newMethod = twoFAMethodSelect.value;
+    if (!current2FAStatus) return;
+    if (!confirm(`Change 2FA method to ${newMethod}?`)) {
+        twoFAMethodSelect.value = current2FAMethod;
+        return;
+    }
+    try {
+        const res = await fetch('/account/settings', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(currentUserEmail ? { 'x-user-email': currentUserEmail } : {})
+            },
+            body: JSON.stringify({ requires2FA: true, twoFAMethod: newMethod })
+        });
+        if (res.ok) {
+            settingsErrAlert.style.display = "none";
+            current2FAMethod = newMethod;
+            update2FAStatusBadge();
+            show2FAMethodSetup(newMethod);
+            // --- Email notification stub ---
+            console.log(`[STUB] Email notification: 2FA method changed to ${newMethod}.`);
+            alert(`2FA method changed to ${newMethod}.`);
+        } else {
+            const data = await res.json();
+            let msg = data && data.error ? data.error : 'Failed to update 2FA method.';
+            settingsErrAlert.innerHTML = `<span><strong>Error: </strong>${msg}</span>`;
+            settingsErrAlert.style.display = "block";
+            twoFAMethodSelect.value = current2FAMethod;
+        }
+    } catch (err) {
+        settingsErrAlert.innerHTML = `<span><strong>Error: </strong>Network error</span>`;
+        settingsErrAlert.style.display = "block";
+        twoFAMethodSelect.value = current2FAMethod;
+    }
+});
 // --- Delete Account Button Logic ---
 const deleteAccountBtn = document.getElementById("delete-account-btn");
 let currentUserEmail = null; // Track logged-in user
@@ -6,6 +148,21 @@ let currentUserEmail = null; // Track logged-in user
 function showDeleteButton(email) {
     currentUserEmail = email;
     deleteAccountBtn.style.display = "inline-block";
+    // Fetch current 2FA settings from backend
+    fetch('/account/settings', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(currentUserEmail ? { 'x-user-email': currentUserEmail } : {})
+        }
+    })
+    .then(res => res.ok ? res.json() : Promise.reject(res))
+    .then(data => {
+        showAccountSettings(data.requires2FA, data.twoFAMethod);
+    })
+    .catch(() => {
+        showAccountSettings(false, "Email");
+    });
 }
 function hideDeleteButton() {
     currentUserEmail = null;
@@ -34,7 +191,7 @@ deleteAccountBtn.addEventListener("click", async () => {
         loginSection.style.display = "block";
         twoFASection.style.display = "none";
         signupSection.style.display = "none";
-        // Optionally clear all forms
+    hideAccountSettings();
         loginForm.email.value = "";
         loginForm.password.value = "";
         signupForm.email.value = "";

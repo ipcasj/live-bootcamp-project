@@ -1,4 +1,4 @@
-//! In-memory HashMap-based user store implementation for the auth-service.
+// In-memory HashMap-based user store implementation for the auth-service.
 /// In-memory user store using a HashMap.
 use std::collections::HashMap;
 use crate::domain::Email;
@@ -19,6 +19,21 @@ pub struct HashmapUserStore {
 
 #[async_trait]
 impl UserStore for HashmapUserStore {
+    async fn update_user(&mut self, user: User) -> Result<(), UserStoreError> {
+        let key = user.email.clone();
+        if self.users.contains_key(&key) {
+            self.users.insert(key, user);
+            Ok(())
+        } else {
+            Err(UserStoreError::UserNotFound)
+        }
+    }
+
+    async fn get_user_settings(&self, email: &crate::domain::Email) -> Result<(bool, crate::domain::user::TwoFAMethod), UserStoreError> {
+        self.users.get(email)
+            .map(|u| (u.requires_2fa, u.two_fa_method.clone()))
+            .ok_or(UserStoreError::UserNotFound)
+    }
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }

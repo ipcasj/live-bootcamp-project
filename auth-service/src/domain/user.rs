@@ -8,6 +8,20 @@ pub struct User {
     pub email: Email,
     pub password: Password,
     pub requires_2fa: bool,
+    pub two_fa_method: TwoFAMethod,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub enum TwoFAMethod {
+    Email,
+    AuthenticatorApp,
+    SMS,
+}
+
+impl Default for TwoFAMethod {
+    fn default() -> Self {
+        TwoFAMethod::Email
+    }
 }
 
 impl User {
@@ -16,6 +30,16 @@ impl User {
             email,
             password,
             requires_2fa,
+            two_fa_method: TwoFAMethod::default(),
+        }
+    }
+
+    pub fn with_2fa_method(email: Email, password: Password, requires_2fa: bool, two_fa_method: TwoFAMethod) -> Self {
+        User {
+            email,
+            password,
+            requires_2fa,
+            two_fa_method,
         }
     }
 }
