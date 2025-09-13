@@ -1,0 +1,1 @@
+/Users/igor/rust_projects/lgr/live-bootcamp-project/target/debug/app-service: /Users/igor/rust_projects/lgr/live-bootcamp-project/app-service/build.rs /Users/igor/rust_projects/lgr/live-bootcamp-project/app-service/src/main.rs /Users/igor/rust_projects/lgr/live-bootcamp-project/app-service/templates/index.html
