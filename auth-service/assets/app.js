@@ -1,379 +1,800 @@
-// --- Foldable Account Settings ---
-document.addEventListener('DOMContentLoaded', function() {
-    const foldable = document.querySelector('.foldable-settings-container');
-    if (foldable) {
-        foldable.addEventListener('mouseenter', () => {
-            foldable.classList.add('unfolded');
+/**
+ * Modern Authentication UI Application
+ * Enhanced UX with progressive validation, loading states, and accessibility
+ */
+
+class AuthApp {
+  constructor() {
+    this.state = {
+      currentView: 'login',
+      user: null,
+      isAuthenticated: false,
+      twoFA: { enabled: false, method: 'Email' },
+      isLoading: false
+    };
+    
+    this.views = {
+      LOGIN: 'login-section',
+      SIGNUP: 'signup-section',
+      TWO_FA: '2fa-section',
+      FORGOT: 'forgot-password-section',
+      SETTINGS: 'account-settings-section'
+    };
+    
+    this.elements = {};
+    this.validationRules = {
+      email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+      password: /.{8,}/
+    };
+    
+    this.init();
+  }
+
+  // Initialize the application
+  init() {
+    this.cacheElements();
+    this.bindEvents();
+    this.setupProgressiveValidation();
+    this.setupAccessibility();
+    this.showView(this.views.LOGIN);
+    this.updateUIState();
+    this.startAuthCheck(); // Start periodic authentication checking
+  }
+
+  // Start periodic authentication status checking
+  startAuthCheck() {
+    // Check auth status every 5 minutes
+    setInterval(() => {
+      if (this.state.isAuthenticated) {
+        this.checkAuthStatus();
+      }
+    }, 5 * 60 * 1000);
+  }
+
+  // Cache DOM elements for performance
+  cacheElements() {
+    // Views
+    Object.values(this.views).forEach(viewId => {
+      this.elements[viewId] = document.getElementById(viewId);
+    });
+    
+    // Forms
+    this.elements.loginForm = document.getElementById('login-form');
+    this.elements.signupForm = document.getElementById('signup-form');
+    this.elements.twoFAForm = document.getElementById('2fa-form');
+    this.elements.forgotForm = document.getElementById('forgot-password-form');
+    this.elements.forgotForm2 = document.getElementById('forgot-password-form-step2');
+    
+    // Alert containers
+    this.elements.alerts = {
+      login: document.getElementById('login-err-alert'),
+      signup: document.getElementById('signup-err-alert'),
+      twoFA: document.getElementById('2fa-err-alert'),
+      forgot: document.getElementById('forgot-password-err-alert'),
+      forgot2: document.getElementById('forgot-password-err-alert-step2'),
+      settings: document.getElementById('settings-err-alert')
+    };
+    
+    // Navigation elements
+    this.elements.header = document.getElementById('app-header');
+    this.elements.userEmail = document.getElementById('user-email');
+    this.elements.userAvatar = document.getElementById('user-avatar');
+    this.elements.twoFABadge = document.getElementById('2fa-badge');
+    this.elements.twoFAToggle = document.getElementById('2fa-toggle');
+    this.elements.twoFAMethod = document.getElementById('2fa-method-select');
+    
+    // Toast container
+    this.elements.toastContainer = document.getElementById('toast-container');
+  }
+
+  // Bind event listeners
+  bindEvents() {
+    // Form submissions
+    this.elements.loginForm?.addEventListener('submit', (e) => this.handleLogin(e));
+    this.elements.signupForm?.addEventListener('submit', (e) => this.handleSignup(e));
+    this.elements.twoFAForm?.addEventListener('submit', (e) => this.handleTwoFA(e));
+    this.elements.forgotForm?.addEventListener('submit', (e) => this.handleForgotPassword(e));
+    this.elements.forgotForm2?.addEventListener('submit', (e) => this.handlePasswordReset(e));
+    
+    // Navigation links
+    this.bindNavigationEvents();
+    
+    // Settings
+    this.elements.twoFAToggle?.addEventListener('change', () => this.toggleTwoFA());
+    this.elements.twoFAMethod?.addEventListener('change', () => this.changeTwoFAMethod());
+    document.getElementById('delete-account-btn')?.addEventListener('click', () => this.deleteAccount());
+  }
+
+  // Bind navigation event listeners
+  bindNavigationEvents() {
+    const navBindings = [
+      { id: 'signup-link', view: this.views.SIGNUP },
+      { id: 'signup-login-link', view: this.views.LOGIN },
+      { id: 'forgot-password-link', view: this.views.FORGOT, callback: () => this.resetForgotPasswordForm() },
+      { id: 'forgot-password-login-link', view: this.views.LOGIN, callback: () => this.resetForgotPasswordForm() },
+      { id: '2fa-login-link', view: this.views.LOGIN, callback: () => this.clearAlert('twoFA') },
+      { id: 'settings-login-link', callback: () => this.logout() }
+    ];
+    
+    navBindings.forEach(({ id, view, callback }) => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (callback) callback();
+          if (view) this.showView(view);
         });
-        foldable.addEventListener('mouseleave', () => {
-            foldable.classList.remove('unfolded');
-        });
+      }
+    });
+  }
+
+  // Setup progressive form validation
+  setupProgressiveValidation() {
+    const forms = [
+      this.elements.loginForm,
+      this.elements.signupForm,
+      this.elements.twoFAForm,
+      this.elements.forgotForm,
+      this.elements.forgotForm2
+    ];
+    
+    forms.forEach(form => {
+      if (!form) return;
+      
+      const inputs = form.querySelectorAll('input[required]');
+      inputs.forEach(input => {
+        input.addEventListener('blur', () => this.validateField(input));
+        input.addEventListener('input', () => this.clearFieldError(input));
+      });
+    });
+  }
+
+  // Setup accessibility features
+  setupAccessibility() {
+    // Add ARIA labels and descriptions
+    document.querySelectorAll('.form-input').forEach(input => {
+      const label = document.querySelector(`label[for="${input.id}"]`);
+      if (label) {
+        input.setAttribute('aria-labelledby', label.id || `${input.id}-label`);
+      }
+    });
+    
+    // Announce view changes to screen readers
+    document.querySelectorAll('.auth-section').forEach(section => {
+      section.setAttribute('role', 'main');
+      section.setAttribute('aria-live', 'polite');
+    });
+  }
+
+  // Validate individual form field
+  validateField(input) {
+    const value = input.value.trim();
+    const fieldName = input.name || input.id;
+    let isValid = true;
+    let errorMessage = '';
+
+    // Required field check
+    if (input.hasAttribute('required') && !value) {
+      isValid = false;
+      errorMessage = `${this.capitalizeFirstLetter(fieldName)} is required`;
     }
-});
-// --- 2FA Toggle Logic ---
-const accountSettingsSection = document.getElementById("account-settings-section");
-const settingsForm = document.getElementById("settings-form");
-const twoFAToggle = document.getElementById("2fa-toggle");
-const settingsErrAlert = document.getElementById("settings-err-alert");
-const twoFAStatusBadge = document.getElementById("2fa-status-badge");
-const twoFAMethodRow = document.getElementById("2fa-method-row");
-const twoFAMethodSelect = document.getElementById("2fa-method-select");
-const twoFAMethodSetup = document.getElementById("2fa-method-setup");
+    // Email validation
+    else if (input.type === 'email' && value && !this.validationRules.email.test(value)) {
+      isValid = false;
+      errorMessage = 'Please enter a valid email address';
+    }
+    // Password validation
+    else if (input.type === 'password' && value && !this.validationRules.password.test(value)) {
+      isValid = false;
+      errorMessage = 'Password must be at least 8 characters long';
+    }
+    // Pattern validation
+    else if (input.pattern && value && !new RegExp(input.pattern).test(value)) {
+      isValid = false;
+      errorMessage = 'Please enter a valid format';
+    }
 
-let current2FAStatus = false;
-let current2FAMethod = "Email";
+    this.setFieldValidationState(input, isValid, errorMessage);
+    return isValid;
+  }
 
-function showAccountSettings(currentRequires2FA, method) {
-    accountSettingsSection.style.display = "block";
-    twoFAToggle.checked = !!currentRequires2FA;
-    current2FAStatus = !!currentRequires2FA;
-    current2FAMethod = method || "Email";
-    update2FAStatusBadge();
-    twoFAMethodRow.style.display = current2FAStatus ? "block" : "none";
-    twoFAMethodSelect.value = current2FAMethod;
-    show2FAMethodSetup(current2FAMethod);
-}
-function hideAccountSettings() {
-    accountSettingsSection.style.display = "none";
-}
-function update2FAStatusBadge() {
-    if (!twoFAStatusBadge) return;
-    if (current2FAStatus) {
-        twoFAStatusBadge.className = "badge bg-success ms-2";
-        twoFAStatusBadge.textContent = `2FA: Enabled (${current2FAMethod})`;
+  // Set field validation state
+  setFieldValidationState(input, isValid, errorMessage = '') {
+    const inputGroup = input.closest('.input-group') || input.parentElement;
+    
+    if (isValid) {
+      input.classList.remove('error');
+      input.removeAttribute('aria-describedby');
+      this.removeFieldError(inputGroup);
     } else {
-        twoFAStatusBadge.className = "badge bg-secondary ms-2";
-        twoFAStatusBadge.textContent = "2FA: Disabled";
+      input.classList.add('error');
+      this.showFieldError(inputGroup, errorMessage);
+      input.setAttribute('aria-describedby', `${input.id}-error`);
     }
-}
-function show2FAMethodSetup(method) {
-    if (!twoFAMethodSetup) return;
-    if (!current2FAStatus) {
-        twoFAMethodSetup.style.display = "none";
-        twoFAMethodSetup.innerHTML = "";
-        return;
-    }
-    twoFAMethodSetup.style.display = "block";
-    if (method === "AuthenticatorApp") {
-        twoFAMethodSetup.innerHTML = `<div class='alert alert-info'>Scan the QR code with your authenticator app. <br><span class='text-muted'>(Stub QR code here)</span></div>`;
-    } else if (method === "SMS") {
-        twoFAMethodSetup.innerHTML = `<div class='alert alert-info'>Enter your phone number to receive codes via SMS. <br><span class='text-muted'>(Stub phone input here)</span></div>`;
-    } else {
-        twoFAMethodSetup.innerHTML = "";
-        twoFAMethodSetup.style.display = "none";
-    }
-}
+  }
 
-twoFAToggle.addEventListener("change", async (e) => {
-    e.preventDefault();
-    const enable = twoFAToggle.checked;
-    const action = enable ? "enable" : "disable";
-    if (!confirm(`Are you sure you want to ${action} 2FA?`)) {
-        twoFAToggle.checked = !enable;
-        return;
+  // Show field-level error
+  showFieldError(container, message) {
+    this.removeFieldError(container);
+    
+    const errorElement = document.createElement('div');
+    errorElement.className = 'field-error text-xs mt-2';
+    errorElement.style.color = 'var(--error-color)';
+    errorElement.textContent = message;
+    errorElement.id = `${container.querySelector('input').id}-error`;
+    
+    container.appendChild(errorElement);
+  }
+
+  // Remove field-level error
+  removeFieldError(container) {
+    const existing = container.querySelector('.field-error');
+    if (existing) existing.remove();
+  }
+
+  // Clear field error on input
+  clearFieldError(input) {
+    input.classList.remove('error');
+    input.removeAttribute('aria-describedby');
+    const container = input.closest('.input-group') || input.parentElement;
+    this.removeFieldError(container);
+  }
+
+  // Validate entire form
+  validateForm(form) {
+    const inputs = form.querySelectorAll('input[required]');
+    let isValid = true;
+    let firstInvalidInput = null;
+
+    inputs.forEach(input => {
+      const fieldValid = this.validateField(input);
+      if (!fieldValid && !firstInvalidInput) {
+        firstInvalidInput = input;
+      }
+      isValid = isValid && fieldValid;
+    });
+
+    if (firstInvalidInput) {
+      firstInvalidInput.focus();
     }
+
+    return isValid;
+  }
+
+  // Show loading state on button
+  setButtonLoading(button, isLoading) {
+    if (isLoading) {
+      button.classList.add('btn-loading');
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+    } else {
+      button.classList.remove('btn-loading');
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+    }
+  }
+
+  // API request wrapper with loading states and auth handling
+  async apiRequest(path, options = {}) {
+    const config = {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.state.user && { 'x-user-email': this.state.user })
+      },
+      credentials: 'include', // Include cookies for JWT auth
+      ...options
+    };
+
+    if (config.body && typeof config.body === 'object') {
+      config.body = JSON.stringify(config.body);
+    }
+
     try {
-        const res = await fetch('/account/settings', {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(currentUserEmail ? { 'x-user-email': currentUserEmail } : {})
-            },
-            body: JSON.stringify({ requires2FA: enable, twoFAMethod: twoFAMethodSelect.value })
-        });
-        if (res.ok) {
-            settingsErrAlert.style.display = "none";
-            current2FAStatus = enable;
-            update2FAStatusBadge();
-            twoFAMethodRow.style.display = enable ? "block" : "none";
-            // --- Email notification stub ---
-            console.log(`[STUB] Email notification: 2FA has been ${enable ? "enabled" : "disabled"}.`);
-            alert(`2FA has been ${enable ? "enabled" : "disabled"}.`);
-        } else {
-            const data = await res.json();
-            let msg = data && data.error ? data.error : 'Failed to update 2FA setting.';
-            settingsErrAlert.innerHTML = `<span><strong>Error: </strong>${msg}</span>`;
-            settingsErrAlert.style.display = "block";
-            twoFAToggle.checked = !enable;
-        }
-    } catch (err) {
-        settingsErrAlert.innerHTML = `<span><strong>Error: </strong>Network error</span>`;
-        settingsErrAlert.style.display = "block";
-        twoFAToggle.checked = !enable;
-    }
-});
+      const response = await fetch(path, config);
+      let data = {};
+      
+      try {
+        data = await response.json();
+      } catch (e) {
+        // Response might not have JSON body
+      }
 
-twoFAMethodSelect.addEventListener("change", async (e) => {
-    const newMethod = twoFAMethodSelect.value;
-    if (!current2FAStatus) return;
-    if (!confirm(`Change 2FA method to ${newMethod}?`)) {
-        twoFAMethodSelect.value = current2FAMethod;
-        return;
+      // Handle authentication errors
+      if (response.status === 401) {
+        if (this.state.isAuthenticated) {
+          this.showToast('Session Expired', 'Please sign in again', 'warning');
+          this.logout();
+        }
+        throw new Error('Authentication required');
+      }
+
+      if (!response.ok) {
+        const errorMessage = data.error || data.message || `HTTP ${response.status}`;
+        throw new Error(errorMessage);
+      }
+
+      return { data, status: response.status };
+    } catch (error) {
+      throw new Error(error.message || 'Network error occurred');
     }
+  }
+
+  // Handle login form submission
+  async handleLogin(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    
+    if (!this.validateForm(form)) return;
+    
+    this.clearAlert('login');
+    this.setButtonLoading(submitButton, true);
+    
     try {
-        const res = await fetch('/account/settings', {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(currentUserEmail ? { 'x-user-email': currentUserEmail } : {})
-            },
-            body: JSON.stringify({ requires2FA: true, twoFAMethod: newMethod })
-        });
-        if (res.ok) {
-            settingsErrAlert.style.display = "none";
-            current2FAMethod = newMethod;
-            update2FAStatusBadge();
-            show2FAMethodSetup(newMethod);
-            // --- Email notification stub ---
-            console.log(`[STUB] Email notification: 2FA method changed to ${newMethod}.`);
-            alert(`2FA method changed to ${newMethod}.`);
-        } else {
-            const data = await res.json();
-            let msg = data && data.error ? data.error : 'Failed to update 2FA method.';
-            settingsErrAlert.innerHTML = `<span><strong>Error: </strong>${msg}</span>`;
-            settingsErrAlert.style.display = "block";
-            twoFAMethodSelect.value = current2FAMethod;
-        }
-    } catch (err) {
-        settingsErrAlert.innerHTML = `<span><strong>Error: </strong>Network error</span>`;
-        settingsErrAlert.style.display = "block";
-        twoFAMethodSelect.value = current2FAMethod;
+      const formData = new FormData(form);
+      const email = formData.get('email');
+      const password = formData.get('password');
+      
+      const response = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (e) {}
+      
+      if (response.status === 206) {
+        // 2FA required
+        const attemptId = data.loginAttemptId || data.login_attempt_id || '';
+        this.elements.twoFAForm.email.value = email;
+        this.elements.twoFAForm.login_attempt_id.value = attemptId;
+        form.reset();
+        this.showView(this.views.TWO_FA);
+        this.showToast('2FA Required', 'Check your email for the verification code', 'warning');
+      } else if (response.ok) {
+        // Successful login
+        form.reset();
+        this.setAuthenticatedUser(email);
+        this.showToast('Welcome!', 'You have successfully signed in');
+        this.showView(this.views.SETTINGS);
+      } else {
+        const errorMessage = data.error || data.message || 'Invalid credentials';
+        this.showAlert('login', errorMessage);
+      }
+    } catch (error) {
+      this.showAlert('login', error.message);
+    } finally {
+      this.setButtonLoading(submitButton, false);
     }
-});
-// --- Delete Account Button Logic ---
-const deleteAccountBtn = document.getElementById("delete-account-btn");
-let currentUserEmail = null; // Track logged-in user
+  }
 
-// Show delete button only when logged in
-function showDeleteButton(email) {
-    currentUserEmail = email;
-    deleteAccountBtn.style.display = "inline-block";
-    // Fetch current 2FA settings from backend
-    fetch('/account/settings', {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            ...(currentUserEmail ? { 'x-user-email': currentUserEmail } : {})
-        }
-    })
-    .then(res => res.ok ? res.json() : Promise.reject(res))
-    .then(data => {
-        showAccountSettings(data.requires2FA, data.twoFAMethod);
-    })
-    .catch(() => {
-        showAccountSettings(false, "Email");
-    });
-}
-function hideDeleteButton() {
-    currentUserEmail = null;
-    deleteAccountBtn.style.display = "none";
-}
-
-deleteAccountBtn.addEventListener("click", async () => {
-    if (!currentUserEmail) {
-        alert("No user logged in.");
-        return;
+  // Handle signup form submission
+  async handleSignup(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    
+    if (!this.validateForm(form)) return;
+    
+    this.clearAlert('signup');
+    this.setButtonLoading(submitButton, true);
+    
+    try {
+      const formData = new FormData(form);
+      const email = formData.get('email');
+      const password = formData.get('password');
+      const requires2FA = formData.get('twoFA') === 'on';
+      
+      const { data } = await this.apiRequest('/signup', {
+        method: 'POST',
+        body: { email, password, requires2FA }
+      });
+      
+      form.reset();
+      this.showToast('Account Created!', 'Please sign in with your new account');
+      this.showView(this.views.LOGIN);
+    } catch (error) {
+      this.showAlert('signup', error.message);
+    } finally {
+      this.setButtonLoading(submitButton, false);
     }
-    if (!confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
-    deleteAccountBtn.disabled = true;
-    const res = await fetch('/delete-account', {
-        method: 'DELETE',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-user-email': currentUserEmail
+  }
+
+  // Handle 2FA verification
+  async handleTwoFA(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    
+    if (!this.validateForm(form)) return;
+    
+    this.clearAlert('twoFA');
+    this.setButtonLoading(submitButton, true);
+    
+    try {
+      const formData = new FormData(form);
+      const email = formData.get('email');
+      const loginAttemptId = formData.get('login_attempt_id');
+      const code = formData.get('email_code');
+      
+      await this.apiRequest('/verify-2fa', {
+        method: 'POST',
+        body: { email, loginAttemptId, '2FACode': code }
+      });
+      
+      form.reset();
+      this.setAuthenticatedUser(email);
+      this.showToast('Success!', 'You have been logged in');
+      this.showView(this.views.SETTINGS);
+    } catch (error) {
+      this.showAlert('twoFA', error.message);
+    } finally {
+      this.setButtonLoading(submitButton, false);
+    }
+  }
+
+  // Handle forgot password (step 1)
+  async handleForgotPassword(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    
+    if (!this.validateForm(form)) return;
+    
+    this.clearAlert('forgot');
+    this.setButtonLoading(submitButton, true);
+    
+    try {
+      const formData = new FormData(form);
+      const email = formData.get('email');
+      
+      const { data } = await this.apiRequest('/forgot-password', {
+        method: 'POST',
+        body: { email }
+      });
+      
+      // Move to step 2
+      document.getElementById('forgot-password-step1').classList.add('hidden');
+      document.getElementById('forgot-password-step2').classList.remove('hidden');
+      
+      this.elements.forgotForm2.email.value = email;
+      this.elements.forgotForm2.login_attempt_id.value = data.loginAttemptId || data.login_attempt_id || '';
+      
+      this.showToast('Reset Code Sent', 'Check your email for the reset code');
+    } catch (error) {
+      this.showAlert('forgot', error.message);
+    } finally {
+      this.setButtonLoading(submitButton, false);
+    }
+  }
+
+  // Handle password reset (step 2)
+  async handlePasswordReset(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitButton = form.querySelector('button[type="submit"]');
+    
+    if (!this.validateForm(form)) return;
+    
+    this.clearAlert('forgot2');
+    this.setButtonLoading(submitButton, true);
+    
+    try {
+      const formData = new FormData(form);
+      const email = formData.get('email');
+      const loginAttemptId = formData.get('login_attempt_id');
+      const code = formData.get('reset_code');
+      const newPassword = formData.get('new_password');
+      
+      await this.apiRequest('/reset-password', {
+        method: 'POST',
+        body: { email, loginAttemptId, code, new_password: newPassword }
+      });
+      
+      this.showToast('Password Reset!', 'You can now sign in with your new password');
+      this.showView(this.views.LOGIN);
+      this.resetForgotPasswordForm();
+    } catch (error) {
+      this.showAlert('forgot2', error.message);
+    } finally {
+      this.setButtonLoading(submitButton, false);
+    }
+  }
+
+  // Toggle 2FA setting
+  async toggleTwoFA() {
+    const enable = this.elements.twoFAToggle.checked;
+    
+    if (!confirm(`Are you sure you want to ${enable ? 'enable' : 'disable'} 2FA?`)) {
+      this.elements.twoFAToggle.checked = !enable;
+      return;
+    }
+    
+    this.clearAlert('settings');
+    
+    try {
+      await this.apiRequest('/account/settings', {
+        method: 'PATCH',
+        body: {
+          requires2FA: enable,
+          twoFAMethod: this.elements.twoFAMethod.value
         }
-    });
-    deleteAccountBtn.disabled = false;
-    if (res.ok) {
-        alert('Account deleted.');
-        hideDeleteButton();
-        // Log out, clear forms, etc.
-        loginSection.style.display = "block";
-        twoFASection.style.display = "none";
-        signupSection.style.display = "none";
-    hideAccountSettings();
-        loginForm.email.value = "";
-        loginForm.password.value = "";
-        signupForm.email.value = "";
-        signupForm.password.value = "";
-        signupForm.twoFA.checked = false;
+      });
+      
+      this.state.twoFA.enabled = enable;
+      this.state.twoFA.method = this.elements.twoFAMethod.value;
+      this.updateTwoFABadge();
+      this.showToast('Settings Updated', `2FA ${enable ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      this.showAlert('settings', error.message);
+      this.elements.twoFAToggle.checked = !enable;
+    }
+  }
+
+  // Change 2FA method
+  changeTwoFAMethod() {
+    this.state.twoFA.method = this.elements.twoFAMethod.value;
+  }
+
+  // Delete account
+  async deleteAccount() {
+    const confirmation = prompt('Type "DELETE" to confirm account deletion:');
+    if (confirmation !== 'DELETE') return;
+    
+    this.clearAlert('settings');
+    
+    try {
+      await this.apiRequest('/delete-account', { method: 'DELETE' });
+      this.showToast('Account Deleted', 'Your account has been permanently deleted');
+      this.logout();
+    } catch (error) {
+      this.showAlert('settings', error.message);
+    }
+  }
+
+  // Set authenticated user state
+  setAuthenticatedUser(email) {
+    this.state.user = email;
+    this.state.isAuthenticated = true;
+    this.loadAccountSettings(); // Load current settings when user logs in
+    this.updateUIState();
+  }
+
+  // Load account settings from backend
+  async loadAccountSettings() {
+    try {
+      const { data } = await this.apiRequest('/account/settings', { method: 'GET' });
+      this.state.twoFA.enabled = data.requires2FA || false;
+      this.state.twoFA.method = data.twoFAMethod || 'Email';
+      this.updateTwoFASettings();
+    } catch (error) {
+      console.warn('Failed to load account settings:', error.message);
+      // Use default values if loading fails
+    }
+  }
+
+  // Check if user is still authenticated (token validation)
+  async checkAuthStatus() {
+    if (!this.state.isAuthenticated) return false;
+    
+    try {
+      await this.apiRequest('/account/settings', { method: 'GET' });
+      return true; // If we can access protected route, we're still authenticated
+    } catch (error) {
+      // If token is invalid, logout user
+      this.logout();
+      return false;
+    }
+  }
+
+  // Logout user
+  async logout() {
+    try {
+      // Call backend logout to invalidate server-side session
+      await this.apiRequest('/logout', { method: 'POST' });
+    } catch (error) {
+      console.warn('Logout API call failed:', error.message);
+      // Continue with client-side logout even if server call fails
+    }
+    
+    // Clear client-side state
+    this.state.user = null;
+    this.state.isAuthenticated = false;
+    this.state.twoFA = { enabled: false, method: 'Email' };
+    this.updateUIState();
+    this.showView(this.views.LOGIN);
+    this.showToast('Signed Out', 'You have been successfully signed out');
+  }
+
+  // Update UI state based on authentication
+  updateUIState() {
+    if (this.state.isAuthenticated) {
+      this.elements.header.style.display = 'block';
+      this.elements.userEmail.textContent = this.state.user;
+      this.elements.userAvatar.textContent = this.state.user.charAt(0).toUpperCase();
+      this.updateTwoFABadge();
+      this.updateTwoFASettings();
     } else {
-        let msg = 'Failed to delete account.';
-        try {
-            const data = await res.json();
-            if (data && data.error) msg = data.error;
-        } catch {}
-        alert(msg);
+      this.elements.header.style.display = 'none';
     }
-});
-const loginSection = document.getElementById("login-section");
-const twoFASection = document.getElementById("2fa-section");
-const signupSection = document.getElementById("signup-section");
+  }
 
-const signupLink = document.getElementById("signup-link");
-const twoFALoginLink = document.getElementById("2fa-login-link");
-const signupLoginLink = document.getElementById("signup-login-link");
+  // Update 2FA badge visibility
+  updateTwoFABadge() {
+    if (this.state.twoFA.enabled) {
+      this.elements.twoFABadge.classList.remove('hidden');
+    } else {
+      this.elements.twoFABadge.classList.add('hidden');
+    }
+  }
 
-signupLink.addEventListener("click", (e) => {
-    e.preventDefault();
+  // Update 2FA settings in the UI
+  updateTwoFASettings() {
+    if (this.elements.twoFAToggle) {
+      this.elements.twoFAToggle.checked = this.state.twoFA.enabled;
+    }
+    if (this.elements.twoFAMethod) {
+      this.elements.twoFAMethod.value = this.state.twoFA.method;
+    }
+  }
 
-    loginSection.style.display = "none";
-    twoFASection.style.display = "none";
-    signupSection.style.display = "block";
-});
-
-twoFALoginLink.addEventListener("click", (e) => {
-    e.preventDefault();
-
-    loginSection.style.display = "block";
-    twoFASection.style.display = "none";
-    signupSection.style.display = "none";
-});
-
-signupLoginLink.addEventListener("click", (e) => {
-    e.preventDefault();
-
-    loginSection.style.display = "block";
-    twoFASection.style.display = "none";
-    signupSection.style.display = "none";
-});
-
-// -----------------------------------------------------
-
-const loginForm = document.getElementById("login-form");
-const loginButton = document.getElementById("login-form-submit");
-const loginErrAlter = document.getElementById("login-err-alert");
-
-loginButton.addEventListener("click", async (e) => {
-    e.preventDefault();
-
-    const email = loginForm.email.value;
-    const password = loginForm.password.value;
-
-
-    fetch('/login', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    body: JSON.stringify({ email, password }),
-    }).then(response => {
-        if (response.status === 206) {
-            TwoFAForm.email.value = email;
-            response.json().then(data => {
-                TwoFAForm.login_attempt_id.value = data.loginAttemptId;
-            });
-
-            loginForm.email.value = "";
-            loginForm.password.value = "";
-
-            loginSection.style.display = "none";
-            twoFASection.style.display = "block";
-            signupSection.style.display = "none";
-            loginErrAlter.style.display = "none";
-        } else if (response.status === 200) {
-            loginForm.email.value = "";
-            loginForm.password.value = "";
-            loginErrAlter.style.display = "none";
-            // Show delete button for logged-in user
-            showDeleteButton(email);
-            alert("You have successfully logged in.");
-        } else {
-            response.json().then(data => {
-                let error_msg = data.error;
-                if (error_msg !== undefined && error_msg !== null && error_msg !== "") {
-                    loginErrAlter.innerHTML = `<span><strong>Error: </strong>${error_msg}</span>`;
-                    loginErrAlter.style.display = "block";
-                } else {
-                    loginErrAlter.style.display = "none";
-                }
-            });
-        }
+  // Show specific view
+  showView(viewId) {
+    // Hide all views
+    Object.values(this.views).forEach(id => {
+      const element = this.elements[id];
+      if (element) {
+        element.classList.add('hidden');
+      }
     });
-});
+    
+    // Show target view
+    const targetView = this.elements[viewId];
+    if (targetView) {
+      targetView.classList.remove('hidden');
+      this.state.currentView = viewId;
+      
+      // Focus first input in the view
+      setTimeout(() => {
+        const firstInput = targetView.querySelector('input');
+        if (firstInput) firstInput.focus();
+      }, 100);
+    }
+  }
 
-const signupForm = document.getElementById("signup-form");
-const signupButton = document.getElementById("signup-form-submit");
-const signupErrAlter = document.getElementById("signup-err-alert");
+  // Show alert message
+  showAlert(type, message) {
+    const alertElement = this.elements.alerts[type];
+    if (!alertElement) return;
+    
+    const contentElement = alertElement.querySelector('.alert-content') || alertElement;
+    contentElement.textContent = message;
+    alertElement.classList.remove('hidden');
+    
+    // Announce to screen readers
+    alertElement.setAttribute('aria-live', 'assertive');
+    
+    // Auto-hide after 10 seconds
+    setTimeout(() => {
+      this.clearAlert(type);
+    }, 10000);
+  }
 
-signupButton.addEventListener("click", async (e) => {
-    e.preventDefault();
+  // Clear alert message
+  clearAlert(type) {
+    const alertElement = this.elements.alerts[type];
+    if (alertElement) {
+      alertElement.classList.add('hidden');
+      alertElement.removeAttribute('aria-live');
+    }
+  }
 
-    const email = signupForm.email.value;
-    const password = signupForm.password.value;
-    const requires2FA = signupForm.twoFA.checked;
-
-
-    fetch('/signup', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    body: JSON.stringify({ email, password, requires2FA }),
-    }).then(response => {
-        if (response.ok) {
-            signupForm.email.value = "";
-            signupForm.password.value = "";
-            signupForm.twoFA.checked = false;
-            signupErrAlter.style.display = "none";
-            alert("You have successfully created a user.");
-            loginSection.style.display = "block";
-            twoFASection.style.display = "none";
-            signupSection.style.display = "none";
-            // Optionally, show delete button for new user (if auto-login)
-            // showDeleteButton(email);
-        } else {
-            response.json().then(data => {
-                let error_msg = data.error;
-                if (error_msg !== undefined && error_msg !== null && error_msg !== "") {
-                    signupErrAlter.innerHTML = `<span><strong>Error: </strong>${error_msg}</span>`;
-                    signupErrAlter.style.display = "block";
-                } else {
-                    signupErrAlter.style.display = "none";
-                }
-            });
-        }
+  // Show toast notification
+  showToast(title, message, variant = 'success', duration = 4000) {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${variant}`;
+    
+    const iconMap = {
+      success: '✅',
+      error: '❌',
+      warning: '⚠️',
+      info: 'ℹ️'
+    };
+    
+    toast.innerHTML = `
+      <div class="toast-icon">${iconMap[variant] || iconMap.info}</div>
+      <div class="toast-content">
+        <div class="toast-title">${this.escapeHtml(title)}</div>
+        <div class="toast-message">${this.escapeHtml(message)}</div>
+      </div>
+      <button class="toast-close" aria-label="Close notification">×</button>
+    `;
+    
+    // Add close functionality
+    toast.querySelector('.toast-close').addEventListener('click', () => {
+      this.removeToast(toast);
     });
-});
+    
+    this.elements.toastContainer.appendChild(toast);
+    
+    // Auto-remove after duration
+    setTimeout(() => {
+      this.removeToast(toast);
+    }, duration);
+  }
 
-const TwoFAForm = document.getElementById("2fa-form");
-const TwoFAButton = document.getElementById("2fa-form-submit");
-const TwoFAErrAlter = document.getElementById("2fa-err-alert");
-
-TwoFAButton.addEventListener("click", (e) => {
-    e.preventDefault();
-
-    const email = TwoFAForm.email.value;
-    const loginAttemptId = TwoFAForm.login_attempt_id.value;
-    const TwoFACode = TwoFAForm.email_code.value;
-
-    fetch('/verify-2fa', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, loginAttemptId, "2FACode": TwoFACode }),
-    }).then(response => {
-        if (response.ok) {
-            TwoFAForm.email.value = "";
-            TwoFAForm.email_code.value = "";
-            TwoFAForm.login_attempt_id.value = "";
-            TwoFAErrAlter.style.display = "none";
-            alert("You have successfully logged in.");
-            loginSection.style.display = "block";
-            twoFASection.style.display = "none";
-            signupSection.style.display = "none";
-            showDeleteButton(email);
-        } else {
-            response.json().then(data => {
-                let error_msg = data.error;
-                if (error_msg !== undefined && error_msg !== null && error_msg !== "") {
-                    TwoFAErrAlter.innerHTML = `<span><strong>Error: </strong>${error_msg}</span>`;
-                    TwoFAErrAlter.style.display = "block";
-                } else {
-                    TwoFAErrAlter.style.display = "none";
-                }
-            });
+  // Remove toast notification
+  removeToast(toast) {
+    if (toast && toast.parentNode) {
+      toast.style.animation = 'slideOut 0.3s ease-in forwards';
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
         }
-    });
-});
+      }, 300);
+    }
+  }
+
+  // Reset forgot password form
+  resetForgotPasswordForm() {
+    this.clearAlert('forgot');
+    this.clearAlert('forgot2');
+    document.getElementById('forgot-password-step1').classList.remove('hidden');
+    document.getElementById('forgot-password-step2').classList.add('hidden');
+    this.elements.forgotForm?.reset();
+    this.elements.forgotForm2?.reset();
+  }
+
+  // Utility: Escape HTML
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Utility: Capitalize first letter
+  capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  }
+}
+
+// Add CSS animation for toast slide out
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes slideOut {
+    to {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+`;
+document.head.appendChild(style);
+
+// Initialize app when DOM is ready
+function initApp() {
+  if (!window.authApp) {
+    window.authApp = new AuthApp();
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
+
+// Also try to initialize after a short delay as fallback
+setTimeout(() => {
+  if (!window.authApp) {
+    initApp();
+  }
+}, 100);

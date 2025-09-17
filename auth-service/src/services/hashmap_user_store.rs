@@ -19,6 +19,14 @@ pub struct HashmapUserStore {
 
 #[async_trait]
 impl UserStore for HashmapUserStore {
+    async fn update_password(&mut self, email: &crate::domain::Email, new_password: crate::domain::Password) -> Result<(), UserStoreError> {
+        if let Some(user) = self.users.get_mut(email) {
+            user.password = new_password;
+            Ok(())
+        } else {
+            Err(UserStoreError::UserNotFound)
+        }
+    }
     async fn update_user(&mut self, user: User) -> Result<(), UserStoreError> {
         let key = user.email.clone();
         if self.users.contains_key(&key) {

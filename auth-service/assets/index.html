@@ -1,211 +1,335 @@
-                        <style>
-                            .foldable-settings-container {
-                                max-height: 44px;
-                                overflow: hidden;
-                                transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1);
-                                border-radius: 0.7rem;
-                                box-shadow: none;
-                                border: 1px solid #e3e8ee;
-                                background: #f5faff;
-                                cursor: pointer;
-                            }
-                            .foldable-settings-container.unfolded {
-                                max-height: 600px;
-                                transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1);
-                                cursor: default;
-                            }
-                            .settings-fold-content { display: none; }
-                            .foldable-settings-container.unfolded .settings-fold-content { display: block; }
-                            .settings-card-minimal {
-                                background: #f5faff;
-                                border: none;
-                                border-radius: 0.7rem;
-                                box-shadow: none;
-                                padding: 0.5rem 0.7rem 0.5rem 0.7rem;
-                            }
-                            .settings-title-minimal {
-                                font-size: 0.98em;
-                                color: #2563eb;
-                                font-weight: 600;
-                                margin-bottom: 0;
-                            }
-                            .settings-label-minimal {
-                                font-size: 0.89em;
-                                color: #222;
-                                margin-bottom: 0;
-                            }
-                            .settings-badge-minimal {
-                                font-size: 0.88em;
-                                background: #2563eb;
-                            }
-                            .settings-switch-minimal {
-                                transform: scale(0.75);
-                                margin-left: 0.2rem;
-                            }
-                            .settings-danger-minimal {
-                                font-size: 0.91em;
-                                color: #ef4444;
-                                font-weight: 500;
-                                margin-bottom: 0;
-                            }
-                            .settings-btn-minimal {
-                                font-size: 0.88em;
-                                padding: 3px 0;
-                                min-height: 28px;
-                            }
-                            .settings-muted-minimal {
-                                font-size: 0.85em;
-                                color: #6b7280;
-                                margin-bottom: 0.2rem;
-                            }
-                            .settings-divider-minimal {
-                                border-top: 1px solid #e3e8ee;
-                                margin: 0.5rem 0 0.5rem 0;
-                            }
-                        </style>
-                        <section id="account-settings-section" style="display: none; position: absolute; top: 80px; right: 2vw; max-width: 320px; font-size: 0.91em; z-index: 10;" class="py-1">
-                            <div class="foldable-settings-container">
-                                <div class="settings-card-minimal">
-                                    <div class="d-flex align-items-center mb-1" style="gap:0.4rem;">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#2563eb" class="me-1" viewBox="0 0 16 16"><path d="M8 1a2 2 0 0 0-2 2v1.278A2 2 0 0 0 4 6v2.278A2 2 0 0 0 2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-1.722V6a2 2 0 0 0-2-1.722V3a2 2 0 0 0-2-2zm0 1a1 1 0 0 1 1 1v1H7V3a1 1 0 0 1 1-1zm-3 5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H5V6zm-2 4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-2z"/></svg>
-                                        <span class="settings-title-minimal">Account Settings</span>
-                                    </div>
-                                    <div class="settings-fold-content">
-                                        <div id="settings-err-alert" class="alert alert-danger py-1 px-2 mb-1" role="alert" style="font-size:0.88em; display: none;"></div>
-                                        <!-- Security Section -->
-                                        <div class="mb-1">
-                                            <div class="d-flex align-items-center justify-content-between mb-0" style="gap:0.3rem;">
-                                                <span class="settings-label-minimal">
-                                                    2FA <span id="2fa-status-badge" class="badge settings-badge-minimal ms-1 align-middle">Unknown</span>
-                                                </span>
-                                                <div class="form-check form-switch m-0 settings-switch-minimal">
-                                                    <input class="form-check-input" type="checkbox" id="2fa-toggle" name="2fa-toggle">
-                                                </div>
-                                            </div>
-                                            <div class="settings-muted-minimal">Extra account security</div>
-                                            <div class="mb-1" id="2fa-method-row" style="display:none;">
-                                                <label for="2fa-method-select" class="form-label mb-0 settings-label-minimal">2FA Method</label>
-                                                <select class="form-select form-select-sm" id="2fa-method-select" name="2fa-method" style="font-size:0.88em;">
-                                                    <option value="Email">Email</option>
-                                                    <option value="AuthenticatorApp">Authenticator App</option>
-                                                    <option value="SMS">SMS</option>
-                                                </select>
-                                            </div>
-                                            <div class="mb-1" id="2fa-method-setup" style="display:none;font-size:0.88em;"></div>
-                                        </div>
-                                        <div class="settings-divider-minimal"></div>
-                                        <div class="d-flex align-items-center mb-1" style="gap:0.3rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="#ef4444" class="me-1" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5.5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6zm3 .5a.5.5 0 0 1 .5-.5.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6zm-7-2A1.5 1.5 0 0 1 5.5 3h5A1.5 1.5 0 0 1 12 4.5V5h1.5A1.5 1.5 0 0 1 14 5.5v.5a.5.5 0 0 1-.5.5H2.5a.5.5 0 0 1-.5-.5v-.5A.5.5 0 0 1 2.5 5H4v-.5zM5.5 4a.5.5 0 0 0-.5.5V5h6v-.5a.5.5 0 0 0-.5-.5h-5z"/></svg>
-                                            <span class="settings-danger-minimal">Danger Zone</span>
-                                        </div>
-                                        <button id="delete-account-btn" class="btn btn-outline-danger btn-sm w-100 settings-btn-minimal" style="border-radius:0.4rem;">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="bi bi-trash me-1" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5.5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6zm3 .5a.5.5 0 0 1 .5-.5.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6zm-7-2A1.5 1.5 0 0 1 5.5 3h5A1.5 1.5 0 0 1 12 4.5V5h1.5A1.5 1.5 0 0 1 14 5.5v.5a.5.5 0 0 1-.5.5H2.5a.5.5 0 0 1-.5-.5v-.5A.5.5 0 0 1 2.5 5H4v-.5zM5.5 4a.5.5 0 0 0-.5.5V5h6v-.5a.5.5 0 0 0-.5-.5h-5z"/></svg>
-                                            Delete Account
-                                        </button>
-                                        <small class="settings-muted-minimal d-block mt-1">This action is irreversible.</small>
-                                    </div>
-                                </div>
-                                </div>
-                            </div>
-                        </section>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auth</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css">
+    <title>Live Bootcamp Auth - Secure Authentication Platform</title>
+    <meta name="description" content="Secure authentication platform with 2FA support, password recovery, and account management">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
-
 <body>
-        <nav class="navbar navbar-expand-sm navbar-dark bg-dark py-3 px-5">
-                <div class="container-fluid">
-                    <a class="navbar-brand" href="#">
-                        <img src="/lgr_logo.png" alt="" width="25" height="25" class="d-inline-block align-text-top">
-                        Auth Service
-                    </a>
-                    <button id="delete-account-btn" class="btn btn-danger ms-auto" style="display:none;">Delete Account</button>
-                </div>
-            </nav>
-    <section id="login-section" class="position-relative py-4 py-xl-5">
-        <div class="container">
-            <div class="row mb-3">
-                <div class="col-md-8 col-xl-6 text-center mx-auto">
-                    <h2>Log in</h2>
-                </div>
-            </div>
-            <div class="row d-flex justify-content-center">
-                <div class="col-md-6 col-xl-4">
-                    <div class="card mb-5">
-                        <div class="card-body d-flex flex-column align-items-center">
-                            <div id="login-err-alert" class="alert alert-danger" role="alert" style="padding: 7px; display: none;"></div>
-                            <form class="text-center" id="login-form" method="post">
-                                <div class="mb-3"><input class="form-control" type="email" name="email" placeholder="Email"></div>
-                                <div class="mb-3"><input class="form-control" type="password" name="password" placeholder="Password"></div>
-                                <div class="mb-3"><button id="login-form-submit" class="btn btn-dark d-block w-100" type="submit">Log in</button></div>
-                                <p><span class="text-muted">Don't have an account?</span>&nbsp;<a id="signup-link" href="#">Sign up here</a></p>
-                            </form>
-                        </div>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header" id="app-header" style="display: none;">
+            <div class="header-content">
+                <a href="#" class="logo" id="logo-link">
+                    <div class="logo-icon">LB</div>
+                    <span>Live Bootcamp</span>
+                </a>
+                <div class="user-menu">
+                    <div class="status-indicator" id="user-status">
+                        <span class="status-dot"></span>
+                        <span id="user-email">Welcome</span>
+                        <span id="2fa-badge" class="hidden">🔒 2FA</span>
                     </div>
+                    <div class="user-avatar" id="user-avatar">U</div>
                 </div>
             </div>
-        </div>
-    </section>
-    <section id="2fa-section" style="display: none;" class="position-relative py-4 py-xl-5">
-        <div class="container">
-            <div class="row mb-3">
-                <div class="col-md-8 col-xl-6 text-center mx-auto">
-                    <h2>Verification Code</h2>
-                </div>
-            </div>
-            <div class="row d-flex justify-content-center">
-                <div class="col-md-6 col-xl-4">
-                    <div class="card mb-5">
-                        <div class="card-body d-flex flex-column align-items-center">
-                            <div id="2fa-err-alert" class="alert alert-danger" role="alert" style="padding: 7px; display: none;"></div>
-                            <form class="text-center" id="2fa-form" method="post">
-                                <input class="form-control" type="hidden" name="email" />
-                                <input class="form-control" type="hidden" name="login_attempt_id" />
-                                <div class="mb-3"><input class="form-control" type="text" name="email_code" placeholder="123486"></div>
-                                <div class="mb-3"><button id="2fa-form-submit" class="btn btn-dark d-block w-100" type="submit">Verify</button></div>
-                                <p><span class="text-muted">Want to go back?</span>&nbsp;<a id="2fa-login-link" href="#">Log in here</a></p>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-    <section id="signup-section" style="display: none;" class="position-relative py-4 py-xl-5">
-        <div class="container">
-            <div class="row mb-3">
-                <div class="col-md-8 col-xl-6 text-center mx-auto">
-                    <h2>Sign up</h2>
-                </div>
-            </div>
-            <div class="row d-flex justify-content-center">
-                <div class="col-md-6 col-xl-4">
-                    <div class="card mb-5">
-                        <div class="card-body d-flex flex-column align-items-center">
-                            <div id="signup-err-alert" class="alert alert-danger" role="alert" style="padding: 7px; display: none;"></div>
-                            <form class="text-center" id="signup-form" method="post">
-                                <div class="mb-3"><input class="form-control" type="email" name="email" placeholder="Email"></div>
-                                <div class="mb-3"><input class="form-control" type="password" name="password" placeholder="Password"></div>
-                                <div>
-                                    <div class="form-check text-start mb-3"><input class="form-check-input" type="checkbox" id="2FA-checkbox" name="twoFA"><label class="form-check-label" for="2FA-checkbox">Require 2-factor email authentication&nbsp;</label></div>
-                                </div>
-                                <div class="mb-3"><button id="signup-form-submit" class="btn btn-dark d-block w-100" type="submit">Sign up</button></div>
-                                <p><span class="text-muted">Already have an account?</span>&nbsp;<a id="signup-login-link" href="#">Log in here</a></p>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-    <script src="app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
+        </header>
 
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Login Section -->
+            <section id="login-section" class="auth-section">
+                <div class="auth-card">
+                    <div class="form-section">
+                        <h1 class="section-title">Welcome back</h1>
+                        <p class="section-subtitle">Sign in to your account to continue</p>
+                        
+                        <div id="login-err-alert" class="alert alert-error hidden" role="alert">
+                            <span class="alert-icon">⚠️</span>
+                            <div class="alert-content"></div>
+                        </div>
+                        
+                        <form id="login-form" novalidate>
+                            <div class="form-group">
+                                <label for="login-email" class="form-label">Email address</label>
+                                <div class="input-group">
+                                    <span class="input-icon">📧</span>
+                                    <input type="email" class="form-input" id="login-email" name="email" 
+                                           placeholder="Enter your email" required autocomplete="email">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="login-password" class="form-label">Password</label>
+                                <div class="input-group">
+                                    <span class="input-icon">🔒</span>
+                                    <input type="password" class="form-input" id="login-password" name="password" 
+                                           placeholder="Enter your password" required autocomplete="current-password">
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary btn-full" id="login-submit">
+                                <span class="btn-text">Sign in</span>
+                            </button>
+                        </form>
+                        
+                        <div class="nav-links">
+                            <div class="nav-link">
+                                <a href="#" class="link" id="forgot-password-link">Forgot your password?</a>
+                            </div>
+                            <div class="nav-link">
+                                Don't have an account? <a href="#" class="link" id="signup-link">Create one</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Signup Section -->
+            <section id="signup-section" class="auth-section hidden">
+                <div class="auth-card">
+                    <div class="form-section">
+                        <h1 class="section-title">Create account</h1>
+                        <p class="section-subtitle">Get started with your new account</p>
+                        
+                        <div id="signup-err-alert" class="alert alert-error hidden" role="alert">
+                            <span class="alert-icon">⚠️</span>
+                            <div class="alert-content"></div>
+                        </div>
+                        
+                        <form id="signup-form" novalidate>
+                            <div class="form-group">
+                                <label for="signup-email" class="form-label">Email address</label>
+                                <div class="input-group">
+                                    <span class="input-icon">📧</span>
+                                    <input type="email" class="form-input" id="signup-email" name="email" 
+                                           placeholder="Enter your email" required autocomplete="email">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="signup-password" class="form-label">Password</label>
+                                <div class="input-group">
+                                    <span class="input-icon">🔒</span>
+                                    <input type="password" class="form-input" id="signup-password" name="password" 
+                                           placeholder="Choose a strong password" required autocomplete="new-password">
+                                </div>
+                                <div class="text-xs text-muted mt-2">
+                                    Password must be at least 8 characters long
+                                </div>
+                            </div>
+                            
+                            <div class="checkbox-group">
+                                <input type="checkbox" class="checkbox-input" id="signup-2fa" name="twoFA">
+                                <label for="signup-2fa" class="checkbox-label">
+                                    Enable two-factor authentication (recommended)
+                                </label>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary btn-full" id="signup-submit">
+                                <span class="btn-text">Create account</span>
+                            </button>
+                        </form>
+                        
+                        <div class="nav-links">
+                            <div class="nav-link">
+                                Already have an account? <a href="#" class="link" id="signup-login-link">Sign in</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2FA Verification Section -->
+            <section id="2fa-section" class="auth-section hidden">
+                <div class="auth-card">
+                    <div class="progress-steps">
+                        <div class="progress-step completed">1</div>
+                        <div class="progress-step active">2</div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h1 class="section-title">Two-factor authentication</h1>
+                        <p class="section-subtitle">Enter the verification code sent to your email</p>
+                        
+                        <div id="2fa-err-alert" class="alert alert-error hidden" role="alert">
+                            <span class="alert-icon">⚠️</span>
+                            <div class="alert-content"></div>
+                        </div>
+                        
+                        <form id="2fa-form" novalidate>
+                            <input type="hidden" name="email">
+                            <input type="hidden" name="login_attempt_id">
+                            
+                            <div class="form-group">
+                                <label for="2fa-code" class="form-label">Verification code</label>
+                                <div class="input-group">
+                                    <span class="input-icon">🔢</span>
+                                    <input type="text" class="form-input" id="2fa-code" name="email_code" 
+                                           placeholder="Enter 6-digit code" required autocomplete="one-time-code"
+                                           pattern="[0-9]{6}" maxlength="6">
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary btn-full" id="2fa-submit">
+                                <span class="btn-text">Verify code</span>
+                            </button>
+                        </form>
+                        
+                        <div class="nav-links">
+                            <div class="nav-link">
+                                <a href="#" class="link" id="2fa-login-link">Back to sign in</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Forgot Password Section -->
+            <section id="forgot-password-section" class="auth-section hidden">
+                <div class="auth-card">
+                    <div id="forgot-password-step1">
+                        <div class="form-section">
+                            <h1 class="section-title">Reset password</h1>
+                            <p class="section-subtitle">Enter your email to receive a reset code</p>
+                            
+                            <div id="forgot-password-err-alert" class="alert alert-error hidden" role="alert">
+                                <span class="alert-icon">⚠️</span>
+                                <div class="alert-content"></div>
+                            </div>
+                            
+                            <form id="forgot-password-form" novalidate>
+                                <div class="form-group">
+                                    <label for="forgot-email" class="form-label">Email address</label>
+                                    <div class="input-group">
+                                        <span class="input-icon">📧</span>
+                                        <input type="email" class="form-input" id="forgot-email" name="email" 
+                                               placeholder="Enter your email" required autocomplete="email">
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary btn-full">
+                                    <span class="btn-text">Send reset code</span>
+                                </button>
+                            </form>
+                            
+                            <div class="nav-links">
+                                <div class="nav-link">
+                                    <a href="#" class="link" id="forgot-password-login-link">Back to sign in</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="forgot-password-step2" class="hidden">
+                        <div class="progress-steps">
+                            <div class="progress-step completed">1</div>
+                            <div class="progress-step active">2</div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h1 class="section-title">Enter reset code</h1>
+                            <p class="section-subtitle">Check your email for the verification code</p>
+                            
+                            <div id="forgot-password-err-alert-step2" class="alert alert-error hidden" role="alert">
+                                <span class="alert-icon">⚠️</span>
+                                <div class="alert-content"></div>
+                            </div>
+                            
+                            <form id="forgot-password-form-step2" novalidate>
+                                <input type="hidden" name="email">
+                                <input type="hidden" name="login_attempt_id">
+                                
+                                <div class="form-group">
+                                    <label for="reset-code" class="form-label">Reset code</label>
+                                    <div class="input-group">
+                                        <span class="input-icon">🔢</span>
+                                        <input type="text" class="form-input" id="reset-code" name="reset_code" 
+                                               placeholder="Enter reset code" required autocomplete="one-time-code">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="new-password" class="form-label">New password</label>
+                                    <div class="input-group">
+                                        <span class="input-icon">🔒</span>
+                                        <input type="password" class="form-input" id="new-password" name="new_password" 
+                                               placeholder="Enter new password" required autocomplete="new-password">
+                                    </div>
+                                    <div class="text-xs text-muted mt-2">
+                                        Password must be at least 8 characters long
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary btn-full">
+                                    <span class="btn-text">Reset password</span>
+                                </button>
+                            </form>
+                            
+                            <div class="nav-links">
+                                <div class="nav-link">
+                                    <a href="#" class="link" id="forgot-password-login-link">Back to sign in</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Account Settings Section -->
+            <section id="account-settings-section" class="auth-section hidden">
+                <div class="auth-card">
+                    <div class="form-section">
+                        <h1 class="section-title">Account settings</h1>
+                        <p class="section-subtitle">Manage your security preferences</p>
+                        
+                        <div id="settings-err-alert" class="alert alert-error hidden" role="alert">
+                            <span class="alert-icon">⚠️</span>
+                            <div class="alert-content"></div>
+                        </div>
+                        
+                        <!-- Two-Factor Authentication Settings -->
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" class="checkbox-input" id="2fa-toggle">
+                                <label for="2fa-toggle" class="checkbox-label">
+                                    Enable two-factor authentication
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group" id="2fa-method-group">
+                            <label for="2fa-method-select" class="form-label">2FA Method</label>
+                            <select class="form-input" id="2fa-method-select">
+                                <option value="Email">Email</option>
+                                <option value="SMS">SMS</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Danger Zone -->
+                        <div class="form-section">
+                            <h3 class="text-lg font-semibold text-primary mb-4">Danger zone</h3>
+                            <div class="alert alert-warning">
+                                <span class="alert-icon">⚠️</span>
+                                <div>
+                                    <strong>Delete account</strong><br>
+                                    This action cannot be undone. All your data will be permanently deleted.
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-danger" id="delete-account-btn">
+                                Delete account
+                            </button>
+                        </div>
+                        
+                        <div class="nav-links">
+                            <div class="nav-link">
+                                <a href="#" class="link" id="settings-login-link">Sign out</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Toast Container -->
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+</body>
 </html>

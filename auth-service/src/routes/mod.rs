@@ -6,3 +6,4 @@ pub mod logout;
 pub mod verify_2fa;
 pub mod verify_token;
 pub mod refresh_token;
+pub mod reset_password;

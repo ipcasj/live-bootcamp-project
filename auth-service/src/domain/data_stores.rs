@@ -99,6 +99,7 @@ pub trait UserStore: Send + Sync + Any {
     async fn get_user(&self, email: &Email) -> Result<User, UserStoreError>;
     async fn validate_user(&self, email: &Email, password: &str) -> Result<(), UserStoreError>;
     async fn delete_user(&mut self, email: &Email) -> Result<(), UserStoreError>;
+    async fn update_password(&mut self, email: &Email, new_password: crate::domain::Password) -> Result<(), UserStoreError>;
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }

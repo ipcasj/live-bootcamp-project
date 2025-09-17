@@ -1,0 +1,30 @@
+# Page snapshot
+
+```yaml
+- main [ref=e3]:
+  - main [ref=e4]:
+    - generic [ref=e6]:
+      - heading "Create account" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Get started with your new account
+      - generic [ref=e9]:
+        - generic [ref=e10]:
+          - generic [ref=e11]: Email address
+          - generic [ref=e12]:
+            - generic [ref=e13]: 📧
+            - textbox "Email address" [active] [ref=e14]: test1758070242291@example.com
+        - generic [ref=e15]:
+          - generic [ref=e16]: Password
+          - generic [ref=e17]:
+            - generic [ref=e18]: 🔒
+            - textbox "Password" [ref=e19]: password123
+          - generic [ref=e20]: Password must be at least 8 characters long
+        - generic [ref=e21]:
+          - checkbox "Enable two-factor authentication (recommended)" [ref=e22] [cursor=pointer]
+          - generic [ref=e23] [cursor=pointer]: Enable two-factor authentication (recommended)
+        - button "Create account" [ref=e24] [cursor=pointer]:
+          - generic [ref=e25] [cursor=pointer]: Create account
+      - generic [ref=e27]:
+        - text: Already have an account?
+        - link "Sign in" [ref=e28] [cursor=pointer]:
+          - /url: "#"
+```
