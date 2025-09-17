@@ -1,4 +1,6 @@
 use axum::routing::get_service;
+use sqlx::{PgPool, postgres::PgPoolOptions};
+
 pub mod auth {
     tonic::include_proto!("auth");
 }
@@ -215,3 +217,15 @@ impl Application {
     }
 }
 // This module is used to define the Application struct and its methods.
+
+/// Creates a PostgreSQL connection pool
+/// 
+/// # Arguments
+/// * `url` - Database connection URL
+/// 
+/// # Returns
+/// * `Result<PgPool, sqlx::Error>` - Connection pool or error
+pub async fn get_postgres_pool(url: &str) -> Result<PgPool, sqlx::Error> {
+    // Create a new PostgreSQL connection pool
+    PgPoolOptions::new().max_connections(5).connect(url).await
+}

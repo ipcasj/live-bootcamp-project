@@ -1,0 +1,5 @@
+cargo:rerun-if-changed=migrations
+cargo:rerun-if-changed=proto/auth.proto
+cargo:rerun-if-changed=proto
+cargo:rerun-if-changed=proto/google/protobuf
+cargo:rerun-if-changed=proto/prost

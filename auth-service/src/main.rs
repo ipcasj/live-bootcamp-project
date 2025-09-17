@@ -3,17 +3,23 @@
 //! - Initializes logging and application state.
 //! - Starts the Axum server.
 use tracing_subscriber;
-use auth_service::Application;
+use auth_service::{Application, get_postgres_pool};
 use auth_service::app_state::{AppState, UserStoreType};
 use auth_service::services::hashmap_user_store::HashmapUserStore;
 use auth_service::grpc;
 use auth_service::services::two_fa_code_store_factory::default_two_fa_code_store;
+use auth_service::utils::constants::DATABASE_URL;
 use tonic::transport::Server;
+use sqlx::PgPool;
 
 #[tokio::main]
 async fn main() {
     // Initialize tracing subscriber for structured logging
     tracing_subscriber::fmt::init();
+
+    // We will use this PostgreSQL pool in the next task! 
+    let _pg_pool = configure_postgresql().await;
+
     use auth_service::services::hashset_banned_token_store::HashsetBannedTokenStore;
     let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(HashmapUserStore::default()));
     let banned_token_store = std::sync::Arc::new(HashsetBannedTokenStore::default());
@@ -52,4 +58,19 @@ async fn main() {
             }
         }
     }
+}
+
+async fn configure_postgresql() -> PgPool {
+    // Create a new database connection pool
+    let pg_pool = get_postgres_pool(&DATABASE_URL)
+        .await
+        .expect("Failed to create Postgres connection pool!");
+
+    // Run database migrations against our test database! 
+    sqlx::migrate!()
+        .run(&pg_pool)
+        .await
+        .expect("Failed to run migrations");
+
+    pg_pool
 }
