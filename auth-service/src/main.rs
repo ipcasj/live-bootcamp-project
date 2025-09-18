@@ -5,7 +5,7 @@
 use tracing_subscriber;
 use auth_service::{Application, get_postgres_pool};
 use auth_service::app_state::{AppState, UserStoreType};
-use auth_service::services::hashmap_user_store::HashmapUserStore;
+use auth_service::services::data_stores::postgres_user_store::PostgresUserStore;
 use auth_service::grpc;
 use auth_service::services::two_fa_code_store_factory::default_two_fa_code_store;
 use auth_service::utils::constants::DATABASE_URL;
@@ -18,10 +18,10 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // We will use this PostgreSQL pool in the next task! 
-    let _pg_pool = configure_postgresql().await;
+    let pg_pool = configure_postgresql().await;
 
-    use auth_service::services::hashset_banned_token_store::HashsetBannedTokenStore;
-    let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(HashmapUserStore::default()));
+    use auth_service::services::data_stores::hashset_banned_token_store::HashsetBannedTokenStore;
+    let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(PostgresUserStore::new(pg_pool)));
     let banned_token_store = std::sync::Arc::new(HashsetBannedTokenStore::default());
     let two_fa_code_store = default_two_fa_code_store();
     use auth_service::services::mock_email_client::MockEmailClient;

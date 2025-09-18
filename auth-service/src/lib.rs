@@ -98,7 +98,7 @@ pub mod app_state {
     pub struct AppState {
         pub user_store: UserStoreType,
         pub banned_token_store: Arc<dyn BannedTokenStore>,
-        pub two_fa_code_store: Arc<tokio::sync::RwLock<crate::services::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
+        pub two_fa_code_store: Arc<tokio::sync::RwLock<crate::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
         pub email_client: Arc<dyn crate::domain::email_client::EmailClient>,
     }
 
@@ -106,7 +106,7 @@ pub mod app_state {
         pub fn new(
             user_store: UserStoreType,
             banned_token_store: Arc<dyn BannedTokenStore>,
-            two_fa_code_store: Arc<tokio::sync::RwLock<crate::services::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
+            two_fa_code_store: Arc<tokio::sync::RwLock<crate::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
             email_client: Arc<dyn crate::domain::email_client::EmailClient>,
         ) -> Self {
             Self { user_store, banned_token_store, two_fa_code_store, email_client }

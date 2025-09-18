@@ -113,7 +113,7 @@ pub async fn signup(
     }
 
     // Debug: print user store state after signup (only if concrete type)
-    if let Some(hm) = user_store.as_any_mut().downcast_mut::<crate::services::hashmap_user_store::HashmapUserStore>() {
+    if let Some(hm) = user_store.as_any_mut().downcast_mut::<crate::services::data_stores::hashmap_user_store::HashmapUserStore>() {
         println!("[DEBUG] Signup: Added user {}. User store ptr: {:p}. Now contains:", user_email, hm);
         for k in hm.users.keys() {
             println!("[DEBUG] - {}", k.as_ref());

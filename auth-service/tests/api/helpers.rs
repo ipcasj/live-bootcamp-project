@@ -6,13 +6,13 @@ use std::sync::Arc;
 use tokio::sync::{oneshot, RwLock};
 
 // use auth_service::domain::data_stores::BannedTokenStore; // unused
-use auth_service::services::hashset_banned_token_store::HashsetBannedTokenStore;
+use auth_service::services::data_stores::hashset_banned_token_store::HashsetBannedTokenStore;
 pub struct TestApp {
     pub address: String,
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
     pub banned_token_store: Arc<HashsetBannedTokenStore>,
-    pub two_fa_code_store: Arc<tokio::sync::RwLock<auth_service::services::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
+    pub two_fa_code_store: Arc<tokio::sync::RwLock<auth_service::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
     shutdown_guard: Option<oneshot::Sender<()>>,
     grpc_shutdown_guard: Option<oneshot::Sender<()>>,
 }
@@ -38,8 +38,8 @@ impl TestApp {
     }
     pub async fn new() -> Self {
         use auth_service::app_state::{AppState, UserStoreType};
-        use auth_service::services::hashmap_user_store::HashmapUserStore;
-        use auth_service::services::hashmap_two_fa_code_store::HashmapTwoFACodeStore;
+        use auth_service::services::data_stores::hashmap_user_store::HashmapUserStore;
+        use auth_service::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeStore;
         use auth_service::routes;
         use axum::{Router, routing::post};
         use tower_http::services::ServeDir;

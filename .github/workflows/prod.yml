@@ -45,6 +45,7 @@ jobs:
       working-directory: ./auth-service
       run: |
         export JWT_SECRET=${{ secrets.JWT_SECRET }}
+        export SQLX_OFFLINE=true
         cargo build --verbose
         cargo test --verbose
 
