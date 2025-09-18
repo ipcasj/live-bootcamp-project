@@ -47,7 +47,6 @@ pub async fn login(
 	State(state): State<Arc<AppState>>,
 	Json(payload): Json<serde_json::Value>,
 ) -> impl IntoResponse {
-	println!("LOGIN ROUTE CALLED");
 	// 422 if missing or malformed fields
 	let email = payload.get("email").and_then(|v| v.as_str());
 	let password = payload.get("password").and_then(|v| v.as_str());
@@ -76,23 +75,12 @@ pub async fn login(
 
 	// 401 if credentials valid format but incorrect
 	let user_store = state.user_store.read().await;
-	tracing::debug!("Calling validate_user for email: {}", email.as_ref());
-	
-	if let Err(e) = user_store.validate_user(&email, password).await {
-		tracing::debug!("validate_user returned error: {:?}", e);
+	if let Err(_) = user_store.validate_user(&email, password).await {
 		return AuthAPIError::IncorrectCredentials.into_response();
 	}
-	
-	tracing::debug!("validate_user succeeded, getting user");
 	let user = match user_store.get_user(&email).await {
-		Ok(user) => {
-			tracing::debug!("get_user succeeded");
-			user
-		},
-		Err(e) => {
-			tracing::debug!("get_user failed: {:?}", e);
-			return AuthAPIError::IncorrectCredentials.into_response();
-		},
+		Ok(user) => user,
+		Err(_) => return AuthAPIError::IncorrectCredentials.into_response(),
 	};
 
 	// Handle request based on user's 2FA configuration

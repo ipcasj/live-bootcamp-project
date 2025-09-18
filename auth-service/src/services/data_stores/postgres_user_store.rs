@@ -73,30 +73,20 @@ impl UserStore for PostgresUserStore {
     }
 
     async fn validate_user(&self, email: &Email, password: &str) -> Result<(), UserStoreError> {
-        tracing::debug!("PostgreSQL validate_user called for email: {}", email.as_ref());
-        
         let row = sqlx::query!(
             "SELECT password_hash FROM users WHERE email = $1",
             email.as_ref()
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| {
-            tracing::debug!("Database query error: {:?}", e);
-            match e {
-                sqlx::Error::RowNotFound => UserStoreError::UserNotFound,
-                _ => UserStoreError::UnexpectedError,
-            }
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => UserStoreError::UserNotFound,
+            _ => UserStoreError::UnexpectedError,
         })?;
 
-        tracing::debug!("Found user, verifying password");
-        
         verify_password_hash(&row.password_hash, password)
             .await
-            .map_err(|e| {
-                tracing::debug!("Password verification failed: {:?}", e);
-                UserStoreError::InvalidCredentials
-            })?;
+            .map_err(|_| UserStoreError::InvalidCredentials)?;
 
         Ok(())
     }
@@ -187,26 +177,15 @@ async fn verify_password_hash(
     expected_password_hash: &str,
     password_candidate: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    tracing::debug!("Verifying password hash");
-    tracing::debug!("Expected hash starts with: {}", &expected_password_hash[..20]);
-    tracing::debug!("Password candidate length: {}", password_candidate.len());
-    
     let expected_password_hash = expected_password_hash.to_string();
     let password_candidate = password_candidate.to_string();
 
     tokio::task::spawn_blocking(move || {
         let expected_password_hash: PasswordHash<'_> = PasswordHash::new(&expected_password_hash)?;
 
-        let result = Argon2::default()
+        Argon2::default()
             .verify_password(password_candidate.as_bytes(), &expected_password_hash)
-            .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) });
-            
-        match &result {
-            Ok(_) => tracing::debug!("Password verification succeeded"),
-            Err(e) => tracing::debug!("Password verification failed: {:?}", e),
-        }
-        
-        result
+            .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })
     })
     .await
     .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?
