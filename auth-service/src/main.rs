@@ -3,30 +3,32 @@
 //! - Initializes logging and application state.
 //! - Starts the Axum server.
 use tracing_subscriber;
-use auth_service::{Application, get_postgres_pool};
+use auth_service::{Application, get_postgres_pool, get_redis_pool};
 use auth_service::app_state::{AppState, UserStoreType};
 use auth_service::services::data_stores::postgres_user_store::PostgresUserStore;
+use auth_service::services::data_stores::redis_banned_token_store::RedisBannedTokenStore;
 use auth_service::grpc;
 use auth_service::services::two_fa_code_store_factory::default_two_fa_code_store;
-use auth_service::utils::constants::DATABASE_URL;
+use auth_service::utils::constants::{DATABASE_URL, REDIS_HOST_NAME};
 use tonic::transport::Server;
 use sqlx::PgPool;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
     // Initialize tracing subscriber for structured logging
     tracing_subscriber::fmt::init();
 
-    // We will use this PostgreSQL pool in the next task! 
+    // Configure PostgreSQL and Redis connections
     let pg_pool = configure_postgresql().await;
+    let redis_pool = configure_redis().await;
 
-    use auth_service::services::data_stores::hashset_banned_token_store::HashsetBannedTokenStore;
-    let user_store: UserStoreType = std::sync::Arc::new(tokio::sync::RwLock::new(PostgresUserStore::new(pg_pool)));
-    let banned_token_store = std::sync::Arc::new(HashsetBannedTokenStore::default());
+    let user_store: UserStoreType = Arc::new(tokio::sync::RwLock::new(PostgresUserStore::new(pg_pool)));
+    let banned_token_store = Arc::new(RedisBannedTokenStore::new(Arc::new(redis_pool)));
     let two_fa_code_store = default_two_fa_code_store();
     use auth_service::services::mock_email_client::MockEmailClient;
-    let email_client = std::sync::Arc::new(MockEmailClient);
-    let app_state = std::sync::Arc::new(AppState::new(user_store, banned_token_store, two_fa_code_store, email_client));
+    let email_client = Arc::new(MockEmailClient);
+    let app_state = Arc::new(AppState::new(user_store, banned_token_store, two_fa_code_store, email_client));
 
     // Set up graceful shutdown signal (Ctrl+C)
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
@@ -73,4 +75,11 @@ async fn configure_postgresql() -> PgPool {
         .expect("Failed to run migrations");
 
     pg_pool
+}
+
+async fn configure_redis() -> bb8::Pool<bb8_redis::RedisConnectionManager> {
+    // Create a new Redis connection pool
+    get_redis_pool(REDIS_HOST_NAME.to_owned())
+        .await
+        .expect("Failed to create Redis connection pool!")
 }

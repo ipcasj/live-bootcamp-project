@@ -61,15 +61,28 @@ async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
     let app = TestApp::new().await;
     let email = TestApp::get_random_email();
     let password = "password123";
-    let response = app.signup(&email, password, false).await;
-    assert_eq!(response.status().as_u16(), 201);
+    
+    // First, test signup
+    let signup_response = app.signup(&email, password, false).await;
+    assert_eq!(signup_response.status().as_u16(), 201);
+    
+    // Then test login
     let login_body = serde_json::json!({
         "email": email,
         "password": password,
     });
-    let response = app.post_login(&login_body).await;
-    assert_eq!(response.status().as_u16(), 200);
-    let auth_cookie = response
+    let login_response = app.post_login(&login_body).await;
+    
+    // Debug output if login fails
+    if login_response.status().as_u16() != 200 {
+        eprintln!("Login failed with status: {}", login_response.status());
+        let body = login_response.text().await.expect("Failed to get response body");
+        eprintln!("Login response body: {}", body);
+        panic!("Login test failed");
+    }
+    
+    assert_eq!(login_response.status().as_u16(), 200);
+    let auth_cookie = login_response
         .cookies()
         .find(|cookie| cookie.name() == JWT_COOKIE_NAME)
         .expect("No auth cookie found");

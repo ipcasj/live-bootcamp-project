@@ -15,12 +15,22 @@ use auth_service::ErrorResponse;
 
 #[tokio::test]
 async fn test_signup() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let email = "test@example.com";
     let password = "password";
     let response = app.signup(email, password, false).await;
-    assert_eq!(response.status(), 201);
+    
+    let status = response.status();
+    if status != 201 {
+        let body = response.text().await.expect("Failed to get response body");
+        eprintln!("Expected 201, got {}. Response body: {}", status, body);
+        app.cleanup().await;
+        panic!("Test failed - see error above");
+    }
+    
+    assert_eq!(status, 201);
+    app.cleanup().await;
 }
 
 #[tokio::test]

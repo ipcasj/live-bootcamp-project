@@ -4,10 +4,12 @@ use uuid::Uuid;
 // use tonic::transport::Server; // unused
 use std::sync::Arc;
 use tokio::sync::{oneshot, RwLock};
-use sqlx::{PgPool, PgConnection, Connection, Executor};
+use sqlx::{PgConnection, Connection, Executor};
 use sqlx::postgres::PgConnectOptions;
 use std::str::FromStr;
 use auth_service::utils::constants::DATABASE_URL;
+use auth_service::{get_redis_pool, get_postgres_pool};
+use auth_service::services::data_stores::redis_banned_token_store::{RedisBannedTokenStore, RedisPool};
 
 // Helper function to delete a test database
 async fn delete_database(db_name: &str) {
@@ -45,7 +47,7 @@ async fn delete_database(db_name: &str) {
 }
 
 // Helper function to create a test database
-async fn create_database(db_name: &str) -> PgPool {
+async fn create_database(db_name: &str) -> sqlx::Pool<sqlx::Postgres> {
     let postgresql_conn_url: String = DATABASE_URL.to_owned();
 
     let connection_options = PgConnectOptions::from_str(&postgresql_conn_url)
@@ -55,20 +57,20 @@ async fn create_database(db_name: &str) -> PgPool {
         .await
         .expect("Failed to connect to Postgres");
 
-    // Create the test database
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, db_name).as_str())
         .await
-        .expect("Failed to create the database.");
+        .expect("Failed to create database.");
 
-    // Create new connection URL with the test database name
-    let base_url = postgresql_conn_url.rsplit_once('/').unwrap().0;
-    let db_url = format!("{}/{}", base_url, db_name);
-    let pool = PgPool::connect(&db_url)
+    // Now we configure the database URL to point to the new database.
+    let postgresql_conn_url_with_db = format!("{}/{}", postgresql_conn_url, db_name);
+
+    // We create and return the connection pool for the test database.
+    let pool = get_postgres_pool(&postgresql_conn_url_with_db)
         .await
-        .expect("Failed to connect to the test database");
+        .expect("Failed to create Postgres connection pool");
 
-    // Run migrations on the test database
+    // Run database migrations on the test database
     sqlx::migrate!()
         .run(&pool)
         .await
@@ -77,15 +79,30 @@ async fn create_database(db_name: &str) -> PgPool {
     pool
 }
 
+// Helper function to cleanup Redis test database
+async fn cleanup_redis_test_database(redis_pool: &RedisPool, test_db: u32) {
+    let mut conn = redis_pool.get().await.expect("Failed to get Redis connection for cleanup");
+    let _: () = bb8_redis::redis::cmd("SELECT")
+        .arg(test_db)
+        .query_async(&mut *conn)
+        .await
+        .expect("Failed to select test database for cleanup");
+    let _: () = bb8_redis::redis::cmd("FLUSHDB")
+        .query_async(&mut *conn)
+        .await
+        .expect("Failed to flush test database");
+}
+
 // use auth_service::domain::data_stores::BannedTokenStore; // unused
-use auth_service::services::data_stores::hashset_banned_token_store::HashsetBannedTokenStore;
 pub struct TestApp {
     pub address: String,
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
-    pub banned_token_store: Arc<HashsetBannedTokenStore>,
+    pub banned_token_store: Arc<RedisBannedTokenStore>,
     pub two_fa_code_store: Arc<tokio::sync::RwLock<auth_service::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
     pub db_name: String,
+    pub redis_db: u32,
+    pub redis_pool: Arc<RedisPool>,
     pub cleanup_called: bool,
     shutdown_guard: Option<oneshot::Sender<()>>,
     grpc_shutdown_guard: Option<oneshot::Sender<()>>,
@@ -125,8 +142,12 @@ impl TestApp {
         // Create and connect to the test database
         let db_pool = create_database(&db_name).await;
 
+        // Set up Redis for test isolation
+        let redis_pool = Arc::new(get_redis_pool("localhost".to_string()).await.expect("Failed to create Redis pool"));
+        let test_redis_db = 1; // Use database 1 for tests (0 is for production)
+        
         let user_store: UserStoreType = Arc::new(RwLock::new(PostgresUserStore::new(db_pool)));
-        let banned_token_store = Arc::new(HashsetBannedTokenStore::default());
+        let banned_token_store = Arc::new(RedisBannedTokenStore::new(redis_pool.clone()));
         let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
         use auth_service::services::mock_email_client::MockEmailClient;
         let email_client = Arc::new(MockEmailClient);
@@ -175,6 +196,8 @@ impl TestApp {
             banned_token_store,
             two_fa_code_store,
             db_name,
+            redis_db: test_redis_db,
+            redis_pool,
             cleanup_called: false,
             shutdown_guard: None,
             grpc_shutdown_guard: None,
@@ -241,10 +264,11 @@ impl TestApp {
         format!("{}@example.com", Uuid::new_v4())
     }
 
-    /// Clean up the test database
+    /// Clean up the test database and Redis test data
     pub async fn cleanup(&mut self) {
         if !self.cleanup_called {
             delete_database(&self.db_name).await;
+            cleanup_redis_test_database(&self.redis_pool, self.redis_db).await;
             self.cleanup_called = true;
         }
     }
@@ -262,7 +286,7 @@ impl Drop for TestApp {
         // Note: We can't call async functions in Drop, so we enforce cleanup
         // through other means. Users should call cleanup() manually.
         if !self.cleanup_called {
-            eprintln!("Warning: TestApp dropped without calling cleanup(). Database '{}' may still exist.", self.db_name);
+            eprintln!("Warning: TestApp dropped without calling cleanup(). Database '{}' and Redis test data may still exist.", self.db_name);
         }
     }
 }

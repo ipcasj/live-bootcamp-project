@@ -6,16 +6,10 @@ use crate::domain::Email;
 use crate::domain::{User, UserStore, UserStoreError};
 use async_trait::async_trait;
 
-
-// TODO: Create a new struct called `HashmapUserStore` containing a `users` field
-// which stores a `HashMap` of email `String`s mapped to `User` objects.
-// Derive the `Default` trait for `HashmapUserStore`.
-
 #[derive(Default)]
 pub struct HashmapUserStore {
     pub users: HashMap<Email, User>,
 }
-
 
 #[async_trait]
 impl UserStore for HashmapUserStore {
@@ -64,8 +58,15 @@ impl UserStore for HashmapUserStore {
 
     async fn validate_user(&self, email: &Email, password: &str) -> Result<(), UserStoreError> {
         match self.users.get(email) {
-            Some(user) if user.password.verify(password) => Ok(()),
-            Some(_) => Err(UserStoreError::InvalidCredentials),
+            Some(user) => {
+                // For hashmap store, use simple string comparison 
+                // since Password now stores plaintext
+                if user.password.as_ref() == password {
+                    Ok(())
+                } else {
+                    Err(UserStoreError::InvalidCredentials)
+                }
+            },
             None => Err(UserStoreError::UserNotFound),
         }
     }

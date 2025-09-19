@@ -72,23 +72,32 @@ impl UserStore for PostgresUserStore {
         })
     }
 
-    async fn validate_user(&self, email: &Email, password: &str) -> Result<(), UserStoreError> {
-        let row = sqlx::query!(
+    async fn validate_user(
+        &self,
+        email: &Email,
+        password: &str,
+    ) -> Result<(), UserStoreError> {
+        let result = sqlx::query!(
             "SELECT password_hash FROM users WHERE email = $1",
             email.as_ref()
         )
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
-        .map_err(|e| match e {
-            sqlx::Error::RowNotFound => UserStoreError::UserNotFound,
-            _ => UserStoreError::UnexpectedError,
-        })?;
+        .map_err(|_| UserStoreError::UnexpectedError)?;
 
-        verify_password_hash(&row.password_hash, password)
-            .await
-            .map_err(|_| UserStoreError::InvalidCredentials)?;
+        if let Some(row) = result {
+            let is_valid = verify_password_hash(&row.password_hash, password)
+                .await
+                .map_err(|_| UserStoreError::UnexpectedError)?;
 
-        Ok(())
+            if is_valid {
+                Ok(())
+            } else {
+                Err(UserStoreError::InvalidCredentials)
+            }
+        } else {
+            Err(UserStoreError::UserNotFound)
+        }
     }
 
     async fn delete_user(&mut self, email: &Email) -> Result<(), UserStoreError> {
@@ -176,19 +185,25 @@ impl UserStore for PostgresUserStore {
 async fn verify_password_hash(
     expected_password_hash: &str,
     password_candidate: &str,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<bool, Box<dyn Error + Send + Sync>> {
     let expected_password_hash = expected_password_hash.to_string();
     let password_candidate = password_candidate.to_string();
 
-    tokio::task::spawn_blocking(move || {
+    let result = tokio::task::spawn_blocking(move || {
         let expected_password_hash: PasswordHash<'_> = PasswordHash::new(&expected_password_hash)?;
 
-        Argon2::default()
-            .verify_password(password_candidate.as_bytes(), &expected_password_hash)
-            .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })
+        // Use Argon2::default() for verification since the hash contains all the parameters
+        let argon2 = Argon2::default();
+
+        match argon2.verify_password(password_candidate.as_bytes(), &expected_password_hash) {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false), // Return false for any verification error, not an actual error
+        }
     })
     .await
-    .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?
+    .map_err(|e| -> Box<dyn Error + Send + Sync> { Box::new(e) })?;
+    
+    result
 }
 
 // Helper function to hash passwords before persisting them in the database.

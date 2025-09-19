@@ -229,3 +229,17 @@ pub async fn get_postgres_pool(url: &str) -> Result<PgPool, sqlx::Error> {
     // Create a new PostgreSQL connection pool
     PgPoolOptions::new().max_connections(5).connect(url).await
 }
+
+/// Creates a Redis connection pool manager
+/// 
+/// # Arguments
+/// * `redis_hostname` - Redis hostname
+/// 
+/// # Returns
+/// * `Result<bb8::Pool<bb8_redis::RedisConnectionManager>, Box<dyn std::error::Error + Send + Sync>>` - Connection pool or error
+pub async fn get_redis_pool(redis_hostname: String) -> Result<bb8::Pool<bb8_redis::RedisConnectionManager>, Box<dyn std::error::Error + Send + Sync>> {
+    let redis_url = format!("redis://{}/", redis_hostname);
+    let manager = bb8_redis::RedisConnectionManager::new(redis_url)?;
+    let pool = bb8::Pool::builder().build(manager).await?;
+    Ok(pool)
+}
