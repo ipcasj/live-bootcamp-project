@@ -4,6 +4,78 @@ use uuid::Uuid;
 // use tonic::transport::Server; // unused
 use std::sync::Arc;
 use tokio::sync::{oneshot, RwLock};
+use sqlx::{PgPool, PgConnection, Connection, Executor};
+use sqlx::postgres::PgConnectOptions;
+use std::str::FromStr;
+use auth_service::utils::constants::DATABASE_URL;
+
+// Helper function to delete a test database
+async fn delete_database(db_name: &str) {
+    let postgresql_conn_url: String = DATABASE_URL.to_owned();
+
+    let connection_options = PgConnectOptions::from_str(&postgresql_conn_url)
+        .expect("Failed to parse PostgreSQL connection string");
+
+    let mut connection = PgConnection::connect_with(&connection_options)
+        .await
+        .expect("Failed to connect to Postgres");
+
+    // Kill any active connections to the database
+    connection
+        .execute(
+            format!(
+                r#"
+                SELECT pg_terminate_backend(pg_stat_activity.pid)
+                FROM pg_stat_activity
+                WHERE pg_stat_activity.datname = '{}'
+                  AND pid <> pg_backend_pid();
+        "#,
+                db_name
+            )
+            .as_str(),
+        )
+        .await
+        .expect("Failed to terminate active connections to the database.");
+
+    // Drop the database
+    connection
+        .execute(format!(r#"DROP DATABASE IF EXISTS "{}";"#, db_name).as_str())
+        .await
+        .expect("Failed to drop the database.");
+}
+
+// Helper function to create a test database
+async fn create_database(db_name: &str) -> PgPool {
+    let postgresql_conn_url: String = DATABASE_URL.to_owned();
+
+    let connection_options = PgConnectOptions::from_str(&postgresql_conn_url)
+        .expect("Failed to parse PostgreSQL connection string");
+
+    let mut connection = PgConnection::connect_with(&connection_options)
+        .await
+        .expect("Failed to connect to Postgres");
+
+    // Create the test database
+    connection
+        .execute(format!(r#"CREATE DATABASE "{}";"#, db_name).as_str())
+        .await
+        .expect("Failed to create the database.");
+
+    // Create new connection URL with the test database name
+    let base_url = postgresql_conn_url.rsplit_once('/').unwrap().0;
+    let db_url = format!("{}/{}", base_url, db_name);
+    let pool = PgPool::connect(&db_url)
+        .await
+        .expect("Failed to connect to the test database");
+
+    // Run migrations on the test database
+    sqlx::migrate!()
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations on test database");
+
+    pool
+}
 
 // use auth_service::domain::data_stores::BannedTokenStore; // unused
 use auth_service::services::data_stores::hashset_banned_token_store::HashsetBannedTokenStore;
@@ -13,6 +85,8 @@ pub struct TestApp {
     pub http_client: reqwest::Client,
     pub banned_token_store: Arc<HashsetBannedTokenStore>,
     pub two_fa_code_store: Arc<tokio::sync::RwLock<auth_service::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
+    pub db_name: String,
+    pub cleanup_called: bool,
     shutdown_guard: Option<oneshot::Sender<()>>,
     grpc_shutdown_guard: Option<oneshot::Sender<()>>,
 }
@@ -38,19 +112,25 @@ impl TestApp {
     }
     pub async fn new() -> Self {
         use auth_service::app_state::{AppState, UserStoreType};
-        use auth_service::services::data_stores::hashmap_user_store::HashmapUserStore;
+        use auth_service::services::data_stores::postgres_user_store::PostgresUserStore;
         use auth_service::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeStore;
         use auth_service::routes;
         use axum::{Router, routing::post};
         use tower_http::services::ServeDir;
         use axum::Server;
 
-        let user_store: UserStoreType = Arc::new(RwLock::new(HashmapUserStore::default()));
+        // Create a unique database name for this test
+        let db_name = Uuid::new_v4().to_string();
+        
+        // Create and connect to the test database
+        let db_pool = create_database(&db_name).await;
+
+        let user_store: UserStoreType = Arc::new(RwLock::new(PostgresUserStore::new(db_pool)));
         let banned_token_store = Arc::new(HashsetBannedTokenStore::default());
         let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
-    use auth_service::services::mock_email_client::MockEmailClient;
-    let email_client = Arc::new(MockEmailClient);
-    let app_state = Arc::new(AppState::new(user_store.clone(), banned_token_store.clone(), two_fa_code_store.clone(), email_client));
+        use auth_service::services::mock_email_client::MockEmailClient;
+        let email_client = Arc::new(MockEmailClient);
+        let app_state = Arc::new(AppState::new(user_store.clone(), banned_token_store.clone(), two_fa_code_store.clone(), email_client));
 
         // Build the router directly for the test
         use utoipa::OpenApi;
@@ -94,6 +174,8 @@ impl TestApp {
             http_client,
             banned_token_store,
             two_fa_code_store,
+            db_name,
+            cleanup_called: false,
             shutdown_guard: None,
             grpc_shutdown_guard: None,
         }
@@ -158,6 +240,14 @@ impl TestApp {
     pub fn get_random_email() -> String {
         format!("{}@example.com", Uuid::new_v4())
     }
+
+    /// Clean up the test database
+    pub async fn cleanup(&mut self) {
+        if !self.cleanup_called {
+            delete_database(&self.db_name).await;
+            self.cleanup_called = true;
+        }
+    }
 }
 
 impl Drop for TestApp {
@@ -167,6 +257,12 @@ impl Drop for TestApp {
         }
         if let Some(tx) = self.grpc_shutdown_guard.take() {
             let _ = tx.send(());
+        }
+        
+        // Note: We can't call async functions in Drop, so we enforce cleanup
+        // through other means. Users should call cleanup() manually.
+        if !self.cleanup_called {
+            eprintln!("Warning: TestApp dropped without calling cleanup(). Database '{}' may still exist.", self.db_name);
         }
     }
 }

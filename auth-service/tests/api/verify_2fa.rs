@@ -102,7 +102,7 @@ async fn should_return_401_if_code_reused() {
     let login_attempt_id = login_json["loginAttemptId"].as_str().unwrap();
     // Use a code (simulate correct code, but reuse)
     let code = "000000";
-    let first = app.post_verify_2fa(&serde_json::json!({
+    let _first = app.post_verify_2fa(&serde_json::json!({
         "email": email,
         "loginAttemptId": login_attempt_id,
         "2FACode": code

@@ -6,3 +6,4 @@ mod root;
 mod signup;
 mod verify_2fa;
 mod verify_token;
+mod database_cleanup;

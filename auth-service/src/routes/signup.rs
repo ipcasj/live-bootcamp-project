@@ -112,16 +112,6 @@ pub async fn signup(
         return Err(AuthAPIError::UnexpectedError(anyhow::anyhow!("Unexpected error adding user: {:?}", e)));
     }
 
-    // Debug: print user store state after signup (only if concrete type)
-    if let Some(hm) = user_store.as_any_mut().downcast_mut::<crate::services::data_stores::hashmap_user_store::HashmapUserStore>() {
-        println!("[DEBUG] Signup: Added user {}. User store ptr: {:p}. Now contains:", user_email, hm);
-        for k in hm.users.keys() {
-            println!("[DEBUG] - {}", k.as_ref());
-        }
-    } else {
-        println!("[DEBUG] Signup: User store is not a HashmapUserStore");
-    }
-
     info!(email = %user_email, "User created successfully");
     let response = Json(SignupResponseRest {
         message: "User created successfully!".to_string(),
