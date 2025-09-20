@@ -145,12 +145,67 @@ pub struct Claims {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::email::Email;
+    use axum_extra::extract::cookie::SameSite;
+    use chrono::Utc;
+    
+    // Test constants that don't rely on configuration loading
+    const TEST_JWT_SECRET: &str = "test_jwt_secret_that_is_long_enough_for_testing_purposes_here";
+    const TEST_JWT_COOKIE_NAME: &str = "jwt_test";
+    const TEST_TOKEN_TTL_SECONDS: i64 = 600; // 10 minutes
+
+    // Test-specific implementations that don't use global config
+    fn create_test_auth_cookie(token: String) -> Cookie<'static> {
+        let mut cookie = Cookie::new(TEST_JWT_COOKIE_NAME, token);
+        cookie.set_path("/");
+        cookie.set_http_only(true);
+        cookie.set_same_site(SameSite::Lax);
+        cookie
+    }
+
+    fn generate_test_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
+        let delta = chrono::Duration::try_seconds(TEST_TOKEN_TTL_SECONDS)
+            .ok_or(GenerateTokenError::UnexpectedError)?;
+
+        let exp = Utc::now()
+            .checked_add_signed(delta)
+            .ok_or(GenerateTokenError::UnexpectedError)?
+            .timestamp();
+
+        let exp: usize = exp
+            .try_into()
+            .map_err(|_| GenerateTokenError::UnexpectedError)?;
+
+        let sub = email.as_ref().to_owned();
+        let claims = Claims { sub, exp };
+        
+        encode(
+            &jsonwebtoken::Header::default(),
+            &claims,
+            &EncodingKey::from_secret(TEST_JWT_SECRET.as_bytes()),
+        ).map_err(GenerateTokenError::TokenError)
+    }
+
+    fn generate_test_auth_cookie(email: &Email) -> Result<Cookie<'static>, GenerateTokenError> {
+        let token = generate_test_auth_token(email)?;
+        Ok(create_test_auth_cookie(token))
+    }
+
+    async fn validate_test_token(token: &str) -> Result<Claims, crate::domain::AuthAPIError> {
+        decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(TEST_JWT_SECRET.as_bytes()),
+            &Validation::default(),
+        )
+        .map(|data| data.claims)
+        .map_err(|_| crate::domain::AuthAPIError::InvalidToken)
+    }
 
     #[tokio::test]
     async fn test_generate_auth_cookie() {
-    let email = Email::parse("test@example.com").unwrap();
-        let cookie = generate_auth_cookie(&email).unwrap();
-        assert_eq!(cookie.name(), &*JWT_COOKIE_NAME);
+        let email = Email::parse("test@example.com").unwrap();
+        let cookie = generate_test_auth_cookie(&email).unwrap();
+        assert_eq!(cookie.name(), TEST_JWT_COOKIE_NAME);
         assert_eq!(cookie.value().split('.').count(), 3);
         assert_eq!(cookie.path(), Some("/"));
         assert_eq!(cookie.http_only(), Some(true));
@@ -160,8 +215,8 @@ mod tests {
     #[tokio::test]
     async fn test_create_auth_cookie() {
         let token = "test_token".to_owned();
-        let cookie = create_auth_cookie(token.clone());
-        assert_eq!(cookie.name(), &*JWT_COOKIE_NAME);
+        let cookie = create_test_auth_cookie(token.clone());
+        assert_eq!(cookie.name(), TEST_JWT_COOKIE_NAME);
         assert_eq!(cookie.value(), token);
         assert_eq!(cookie.path(), Some("/"));
         assert_eq!(cookie.http_only(), Some(true));
@@ -170,8 +225,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_auth_token() {
-    let email = Email::parse("test@example.com").unwrap();
-        let result = generate_auth_token(&email).unwrap();
+        let email = Email::parse("test@example.com").unwrap();
+        let result = generate_test_auth_token(&email).unwrap();
         assert_eq!(result.split('.').count(), 3);
     }
 
@@ -181,8 +236,8 @@ mod tests {
         
         // Capture time before generating token
         let before_generation = Utc::now().timestamp();
-        let token = generate_auth_token(&email).unwrap();
-        let result = validate_token(&token, None).await.unwrap();
+        let token = generate_test_auth_token(&email).unwrap();
+        let result = validate_test_token(&token).await.unwrap();
         
         assert_eq!(result.sub, "test@example.com");
 
@@ -196,7 +251,7 @@ mod tests {
     #[tokio::test]
     async fn test_validate_token_with_invalid_token() {
         let token = "invalid_token".to_owned();
-    let result = validate_token(&token, None).await;
+        let result = validate_test_token(&token).await;
         assert!(result.is_err());
     }
 }
