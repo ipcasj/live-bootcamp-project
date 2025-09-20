@@ -16,11 +16,12 @@ async fn should_return_401_if_token_is_banned() {
         .expect("No set-cookie header")
         .to_str()
         .unwrap();
+    let cookie_prefix = format!("{}=", &*JWT_COOKIE_NAME);
     let token = cookie
         .split(';')
-        .find(|s| s.trim_start().starts_with("jwt="))
+        .find(|s| s.trim_start().starts_with(&cookie_prefix))
         .unwrap()
-        .trim_start_matches("jwt=");
+        .trim_start_matches(&cookie_prefix);
 
     // Logout to ban the token
     let _ = app.logout().await;
@@ -34,6 +35,7 @@ async fn should_return_401_if_token_is_banned() {
 }
 use crate::helpers::TestApp;
 use auth_service::ErrorResponse;
+use auth_service::utils::auth::JWT_COOKIE_NAME;
 
 #[tokio::test]
 async fn should_return_422_if_malformed_input() {
@@ -72,11 +74,12 @@ async fn should_return_200_valid_token() {
         .expect("No set-cookie header")
         .to_str()
         .unwrap();
+    let cookie_prefix = format!("{}=", &*JWT_COOKIE_NAME);
     let token = cookie
         .split(';')
-        .find(|s| s.trim_start().starts_with("jwt="))
+        .find(|s| s.trim_start().starts_with(&cookie_prefix))
         .unwrap()
-        .trim_start_matches("jwt=");
+        .trim_start_matches(&cookie_prefix);
 
     let verify_body = serde_json::json!({ "token": token });
     let response = app.post_verify_token(&verify_body).await;

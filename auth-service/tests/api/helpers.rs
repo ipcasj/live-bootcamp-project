@@ -65,7 +65,17 @@ async fn create_database(db_name: &str) -> sqlx::Pool<sqlx::Postgres> {
         .expect("Failed to create database.");
 
     // Now we configure the database URL to point to the new database.
-    let postgresql_conn_url_with_db = format!("{}/{}", postgresql_conn_url, db_name);
+    // We need to replace the database name in the URL, not append to it
+    let mut base_url = postgresql_conn_url.clone();
+    
+    // Remove any existing database name from the URL
+    if let Some(last_slash) = base_url.rfind('/') {
+        base_url.truncate(last_slash + 1); // Keep the slash
+    } else {
+        base_url.push('/'); // Add slash if not present
+    }
+    
+    let postgresql_conn_url_with_db = format!("{}{}", base_url, db_name);
 
     // We create and return the connection pool for the test database.
     let pool = get_postgres_pool(&postgresql_conn_url_with_db)

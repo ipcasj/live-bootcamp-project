@@ -1,4 +1,5 @@
 use auth_service::domain::data_stores::BannedTokenStore;
+use auth_service::utils::auth::JWT_COOKIE_NAME;
 use crate::helpers::TestApp;
 
 // use reqwest::cookie::CookieStore; // unused
@@ -7,7 +8,7 @@ async fn should_return_500_if_internal_error() {
     let app = TestApp::new().await;
     // Set the jwt cookie to trigger500
     let url = app.address.parse().unwrap();
-    app.cookie_jar.add_cookie_str("jwt=trigger500", &url);
+    app.cookie_jar.add_cookie_str(&format!("{}=trigger500", &*JWT_COOKIE_NAME), &url);
     let response = app.logout().await;
     assert_eq!(response.status(), 500);
 }
@@ -27,7 +28,7 @@ async fn logout_should_return_401_if_invalid_cookie() {
     let app = TestApp::new().await;
     // Set an invalid cookie manually
     let url = app.address.parse().unwrap();
-    app.cookie_jar.add_cookie_str("jwt=invalid.jwt.token", &url);
+    app.cookie_jar.add_cookie_str(&format!("{}=invalid.jwt.token", &*JWT_COOKIE_NAME), &url);
     let response = app.logout().await;
     assert_eq!(response.status(), 401);
 }
@@ -46,13 +47,14 @@ async fn logout_should_clear_cookie_on_success() {
     let login_response = app.login(&email, password).await;
     // Extract token from Set-Cookie
     let set_cookie = login_response.headers().get("set-cookie").expect("No set-cookie header").to_str().unwrap();
-    let token = set_cookie.split(';').find(|s| s.trim_start().starts_with("jwt=")).unwrap().trim_start_matches("jwt=");
+    let cookie_prefix = format!("{}=", &*JWT_COOKIE_NAME);
+    let token = set_cookie.split(';').find(|s| s.trim_start().starts_with(&cookie_prefix)).unwrap().trim_start_matches(&cookie_prefix);
     // Now logout
     let response = app.logout().await;
     assert_eq!(response.status(), 200);
     // Check that the Set-Cookie header clears the cookie
     let cookies: Vec<_> = response.headers().get_all("set-cookie").iter().collect();
-    assert!(cookies.iter().any(|c| c.to_str().unwrap().contains("jwt=;")));
+    assert!(cookies.iter().any(|c| c.to_str().unwrap().contains(&format!("{}=;", &*JWT_COOKIE_NAME))));
     // Check that the token is banned
     assert!(app.banned_token_store.is_banned(token).await);
     
