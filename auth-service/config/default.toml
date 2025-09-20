@@ -22,3 +22,4 @@ jwt_expiration = 3600         # 1 hour
 refresh_token_expiration = 604800  # 7 days
 jwt_cookie_name = "jwt"
 two_fa_code_expiration = 600  # 10 minutes
+banned_token_ttl = 3600       # 1 hour (should match jwt_expiration)

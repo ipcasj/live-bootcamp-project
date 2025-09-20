@@ -104,6 +104,10 @@ pub struct AuthConfig {
     /// 2FA code expiration time in seconds
     #[serde(default = "default_2fa_code_expiration")]
     pub two_fa_code_expiration: u64,
+
+    /// Banned token expiration time in seconds (TTL for Redis)
+    #[serde(default = "default_banned_token_ttl")]
+    pub banned_token_ttl: u64,
 }
 
 impl AppConfig {
@@ -233,6 +237,10 @@ fn default_2fa_code_expiration() -> u64 {
     600 // 10 minutes
 }
 
+fn default_banned_token_ttl() -> u64 {
+    600 // 10 minutes (same as JWT expiration by default)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,6 +262,8 @@ mod tests {
         env::remove_var("REDIS_HOST_NAME");
         env::remove_var("ENVIRONMENT");
         env::remove_var("REFRESH_TOKEN_SECRET");
+        env::remove_var("AUTH__BANNED_TOKEN_TTL");
+        env::remove_var("AUTH__JWT_EXPIRATION");
         
         let result = f();
         
@@ -263,6 +273,8 @@ mod tests {
         env::remove_var("REDIS_HOST_NAME");
         env::remove_var("ENVIRONMENT");
         env::remove_var("REFRESH_TOKEN_SECRET");
+        env::remove_var("AUTH__BANNED_TOKEN_TTL");
+        env::remove_var("AUTH__JWT_EXPIRATION");
         
         result
     }
@@ -337,6 +349,57 @@ mod tests {
             assert_eq!(config.database.url, "postgres://override:test@localhost:5432/override");
             assert_eq!(config.auth.jwt_secret, "override_secret_key_that_is_long_enough_for_validation");
             assert_eq!(config.redis.host, "redis-override");
+        });
+    }
+
+    #[test]
+    fn test_banned_token_ttl_configuration() {
+        with_clean_env(|| {
+            env::set_var("DATABASE_URL", "postgres://test:test@localhost:5432/test");
+            env::set_var("JWT_SECRET", "test_secret_key_that_is_long_enough_for_validation");
+            env::set_var("ENVIRONMENT", "test");
+            
+            let config = AppConfig::load().expect("Should load");
+            
+            // Test environment has 5 second banned token TTL for fast testing
+            assert_eq!(config.auth.banned_token_ttl, 5);
+            
+            // Verify that banned_token_ttl is configurable and reasonable
+            assert!(config.auth.banned_token_ttl > 0);
+            assert!(config.auth.banned_token_ttl < 3600); // Should be under 1 hour for tests
+        });
+        
+        // Test development environment has different value 
+        with_clean_env(|| {
+            env::set_var("DATABASE_URL", "postgres://test:test@localhost:5432/test");
+            env::set_var("JWT_SECRET", "test_secret_key_that_is_long_enough_for_validation");
+            env::set_var("ENVIRONMENT", "development");
+            
+            let config = AppConfig::load().expect("Should load");
+            
+            // Development environment should have longer TTL (from config files)
+            assert_eq!(config.auth.banned_token_ttl, 3600); // 1 hour from development.toml
+        });
+    }
+
+    #[test]
+    fn test_ttl_configuration_validation() {
+        with_clean_env(|| {
+            env::set_var("DATABASE_URL", "postgres://test:test@localhost:5432/test");
+            env::set_var("JWT_SECRET", "test_secret_key_that_is_long_enough_for_validation");
+            env::set_var("ENVIRONMENT", "test");
+            
+            let config = AppConfig::load().expect("Should load");
+            
+            // Verify all TTL configurations are present and reasonable
+            assert!(config.auth.jwt_expiration > 0);
+            assert!(config.auth.refresh_token_expiration > 0);
+            assert!(config.auth.two_fa_code_expiration > 0);
+            assert!(config.auth.banned_token_ttl > 0);
+            
+            // For test environment, TTL values should be very low for fast testing
+            assert_eq!(config.auth.two_fa_code_expiration, 3); // 3 seconds for fast tests
+            assert_eq!(config.auth.banned_token_ttl, 5); // 5 seconds for fast tests
         });
     }
 }

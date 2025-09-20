@@ -146,15 +146,15 @@ impl TestApp {
         let redis_pool = Arc::new(get_redis_pool("localhost".to_string()).await.expect("Failed to create Redis pool"));
         let test_redis_db = 1; // Use database 1 for tests (0 is for production)
         
-        let user_store: UserStoreType = Arc::new(RwLock::new(PostgresUserStore::new(db_pool)));
-        let banned_token_store = Arc::new(RedisBannedTokenStore::new(redis_pool.clone()));
-        let two_fa_code_store: TwoFACodeStoreType = two_fa_code_store_factory::redis_two_fa_code_store(redis_pool.clone());
-        use auth_service::services::mock_email_client::MockEmailClient;
-        let email_client = Arc::new(MockEmailClient);
-        
         // Create test configuration
         use auth_service::config::AppConfig;
         let test_config = Arc::new(AppConfig::load().expect("Failed to load test configuration"));
+        
+        let user_store: UserStoreType = Arc::new(RwLock::new(PostgresUserStore::new(db_pool)));
+        let banned_token_store = Arc::new(RedisBannedTokenStore::new(redis_pool.clone(), test_config.clone()));
+        let two_fa_code_store: TwoFACodeStoreType = two_fa_code_store_factory::redis_two_fa_code_store(redis_pool.clone(), test_config.clone());
+        use auth_service::services::mock_email_client::MockEmailClient;
+        let email_client = Arc::new(MockEmailClient);
         
         let app_state = Arc::new(AppState::new(
             user_store.clone(), 

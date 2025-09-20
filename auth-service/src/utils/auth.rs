@@ -65,7 +65,9 @@ pub enum GenerateTokenError {
     UnexpectedError,
 }
 
+// DEPRECATED: Use config.auth.jwt_expiration instead
 // This value determines how long the JWT auth token is valid for
+#[deprecated(note = "Use config.auth.jwt_expiration instead")]
 pub const TOKEN_TTL_SECONDS: i64 = 600; // 10 minutes
 
 // Create JWT auth token

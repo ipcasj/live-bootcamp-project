@@ -7,7 +7,7 @@ use async_trait::async_trait;
 
 use crate::{
     domain::data_stores::BannedTokenStore,
-    utils::auth::TOKEN_TTL_SECONDS,
+    config::AppConfig,
 };
 
 pub type RedisPool = Pool<RedisConnectionManager>;
@@ -15,11 +15,12 @@ pub type RedisPool = Pool<RedisConnectionManager>;
 #[derive(Clone)]
 pub struct RedisBannedTokenStore {
     pool: Arc<RedisPool>,
+    config: Arc<AppConfig>,
 }
 
 impl RedisBannedTokenStore {
-    pub fn new(pool: Arc<RedisPool>) -> Self {
-        Self { pool }
+    pub fn new(pool: Arc<RedisPool>, config: Arc<AppConfig>) -> Self {
+        Self { pool, config }
     }
 }
 
@@ -38,7 +39,7 @@ impl BannedTokenStore for RedisBannedTokenStore {
         let key = format!("banned_token:{}", token);
         let _: Result<(), _> = redis::cmd("SETEX")
             .arg(&key)
-            .arg(TOKEN_TTL_SECONDS as u64)
+            .arg(self.config.auth.banned_token_ttl)
             .arg("banned")
             .query_async(&mut *conn)
             .await;

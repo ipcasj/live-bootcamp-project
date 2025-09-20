@@ -23,4 +23,5 @@ connection_timeout = 3
 jwt_expiration = 60           # 1 minute
 refresh_token_expiration = 300   # 5 minutes
 jwt_cookie_name = "jwt_test"
-two_fa_code_expiration = 60   # 1 minute for fast test cycles
+two_fa_code_expiration = 3    # 3 seconds for fast TTL expiration tests
+banned_token_ttl = 5          # 5 seconds for fast TTL expiration tests

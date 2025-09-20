@@ -5,9 +5,12 @@ use bb8_redis::{bb8::Pool, redis, RedisConnectionManager};
 use serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 
-use crate::domain::{
-    data_stores::{LoginAttemptId, TwoFACode, TwoFACodeStore, TwoFACodeStoreError},
-    Email,
+use crate::{
+    domain::{
+        data_stores::{LoginAttemptId, TwoFACode, TwoFACodeStore, TwoFACodeStoreError},
+        Email,
+    },
+    config::AppConfig,
 };
 
 pub type RedisPool = Pool<RedisConnectionManager>;
@@ -15,11 +18,12 @@ pub type RedisPool = Pool<RedisConnectionManager>;
 #[derive(Clone)]
 pub struct RedisTwoFACodeStore {
     pool: Arc<RedisPool>,
+    config: Arc<AppConfig>,
 }
 
 impl RedisTwoFACodeStore {
-    pub fn new(pool: Arc<RedisPool>) -> Self {
-        Self { pool }
+    pub fn new(pool: Arc<RedisPool>, config: Arc<AppConfig>) -> Self {
+        Self { pool, config }
     }
 }
 
@@ -46,7 +50,7 @@ impl TwoFACodeStore for RedisTwoFACodeStore {
 
         let _: () = redis::cmd("SETEX")
             .arg(&key)
-            .arg(TEN_MINUTES_IN_SECONDS)
+            .arg(self.config.auth.two_fa_code_expiration)
             .arg(serialized)
             .query_async(&mut *conn)
             .await
@@ -167,7 +171,6 @@ impl TwoFACodeStore for RedisTwoFACodeStore {
 #[derive(Serialize, Deserialize)]
 struct TwoFATuple(pub String, pub String, pub u64);
 
-const TEN_MINUTES_IN_SECONDS: u64 = 600;
 const TWO_FA_CODE_PREFIX: &str = "two_fa_code:";
 const FAILED_ATTEMPTS_PREFIX: &str = "two_fa_failed:";
 
