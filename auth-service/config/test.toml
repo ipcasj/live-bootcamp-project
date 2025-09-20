@@ -1,0 +1,26 @@
+# Test environment configuration
+environment = "test"
+
+[server]
+host = "127.0.0.1"
+port = 0  # Use random port for tests
+
+[database]
+# Test database with separate database number
+max_connections = 3
+connection_timeout = 10
+
+[redis]
+# Test Redis with separate database
+host = "127.0.0.1"
+port = 6379
+database = 1  # Use database 1 for tests to isolate from dev data
+max_connections = 3
+connection_timeout = 3
+
+[auth]
+# Test JWT settings (very short expiration for fast testing)
+jwt_expiration = 60           # 1 minute
+refresh_token_expiration = 300   # 5 minutes
+jwt_cookie_name = "jwt_test"
+two_fa_code_expiration = 60   # 1 minute for fast test cycles

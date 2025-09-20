@@ -151,7 +151,18 @@ impl TestApp {
         let two_fa_code_store: TwoFACodeStoreType = two_fa_code_store_factory::redis_two_fa_code_store(redis_pool.clone());
         use auth_service::services::mock_email_client::MockEmailClient;
         let email_client = Arc::new(MockEmailClient);
-        let app_state = Arc::new(AppState::new(user_store.clone(), banned_token_store.clone(), two_fa_code_store.clone(), email_client));
+        
+        // Create test configuration
+        use auth_service::config::AppConfig;
+        let test_config = Arc::new(AppConfig::load().expect("Failed to load test configuration"));
+        
+        let app_state = Arc::new(AppState::new(
+            user_store.clone(), 
+            banned_token_store.clone(), 
+            two_fa_code_store.clone(), 
+            email_client,
+            test_config
+        ));
 
         // Build the router directly for the test
         use utoipa::OpenApi;

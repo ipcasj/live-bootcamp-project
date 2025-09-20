@@ -1,0 +1,27 @@
+# Development environment configuration
+environment = "development"
+
+[server]
+# Development server settings
+host = "127.0.0.1"
+port = 3000
+
+[database]
+# Local development database
+max_connections = 5
+connection_timeout = 30
+
+[redis]
+# Local Redis for development
+host = "127.0.0.1"
+port = 6379
+database = 0
+max_connections = 5
+connection_timeout = 5
+
+[auth]
+# Development JWT settings (shorter expiration for testing)
+jwt_expiration = 3600         # 1 hour
+refresh_token_expiration = 86400  # 1 day
+jwt_cookie_name = "jwt_dev"
+two_fa_code_expiration = 300  # 5 minutes for faster testing

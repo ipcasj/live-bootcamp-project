@@ -7,6 +7,7 @@ pub mod auth {
 pub mod grpc;
 pub mod api_doc;
 pub mod utils;
+pub mod config;
 /// Main library file for the auth-service crate.
 ///
 /// - Defines application state, error handling, and main application struct.
@@ -103,6 +104,7 @@ pub mod app_state {
         pub banned_token_store: Arc<dyn BannedTokenStore>,
         pub two_fa_code_store: TwoFACodeStoreType,
         pub email_client: Arc<dyn crate::domain::email_client::EmailClient>,
+        pub config: Arc<crate::config::AppConfig>,
     }
 
     impl AppState {
@@ -111,8 +113,9 @@ pub mod app_state {
             banned_token_store: Arc<dyn BannedTokenStore>,
             two_fa_code_store: TwoFACodeStoreType,
             email_client: Arc<dyn crate::domain::email_client::EmailClient>,
+            config: Arc<crate::config::AppConfig>,
         ) -> Self {
-            Self { user_store, banned_token_store, two_fa_code_store, email_client }
+            Self { user_store, banned_token_store, two_fa_code_store, email_client, config }
         }
     }
 }

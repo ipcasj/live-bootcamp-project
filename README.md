@@ -1,12 +1,15 @@
 # Live Bootcamp Project - Auth Service
 
-A production-ready authentication service with Redis-backed 2FA, PostgreSQL user storage, and comprehensive security features.
+A production-ready authentication service with Redis-backed 2FA, PostgreSQL user storage, modern configuration management, and comprehensive security features.
 
 ## 🚀 Features
 
+- **Modern Configuration Management**: Hierarchical config-rs system with environment profiles
 - **Redis-backed 2FA Code Store**: Persistent, scalable 2FA code management with automatic expiration
 - **PostgreSQL User Storage**: Robust user data persistence with Argon2 password hashing
 - **JWT Authentication**: Secure token-based authentication with banned token tracking
+- **Environment Profiles**: Development, test, and production configurations
+- **Type-Safe Configuration**: Validated configuration with graceful error handling
 - **REST & gRPC APIs**: Complete API coverage with OpenAPI documentation
 - **Docker Support**: Containerized deployment with Docker Compose
 
@@ -132,50 +135,173 @@ curl -i -X POST http://localhost:3000/login \
 
 ## 🔧 Configuration
 
-### Local Development Environment Variables
+The application uses a modern, hierarchical configuration system powered by config-rs.
 
-- `DATABASE_URL`: PostgreSQL connection string (required)
-- `REDIS_HOST_NAME`: Redis host (default: localhost)
-- `JWT_SECRET`: Secret key for JWT token signing
-- `POSTGRES_PASSWORD`: PostgreSQL database password
+### Configuration Hierarchy (Priority: High → Low)
 
-Example `.env` file:
-```bash
-DATABASE_URL=postgres://postgres:SecurePass2024!@localhost:5432/auth
-REDIS_HOST_NAME=localhost
-JWT_SECRET=g4iNvB23GraeR2d1SsIDL9lxqynITs/8c9JOSL0BvY5aR6a1Lv69gl1Gq0N6vJLY5ntgpRg3WOvzqXVojUGdBA==
-POSTGRES_PASSWORD=SecurePass2024!
-SQLX_OFFLINE=true
+1. **Environment Variables** (Highest priority)
+   - Modern prefix: `AUTH_DATABASE__URL`, `AUTH_REDIS__HOST`, etc.
+   - Legacy compatibility: `DATABASE_URL`, `REDIS_HOST_NAME`, `JWT_SECRET`
+2. **Environment-specific config files** (e.g., `config/production.toml`)
+3. **Base config file** (`config/default.toml`)  
+4. **Built-in defaults** (Lowest priority)
+
+### Environment Profiles
+
+The application supports different environments via the `ENVIRONMENT` variable:
+
+**Development** (`config/development.toml`):
+```toml
+environment = "development"
+[server]
+host = "127.0.0.1"
+port = 3000
+
+[auth]
+jwt_expiration = 3600         # 1 hour
+refresh_token_expiration = 86400  # 1 day
+jwt_cookie_name = "jwt_dev"
+two_fa_code_expiration = 300  # 5 minutes
 ```
 
-### Production Environment (Docker Compose)
+**Test** (`config/test.toml`):
+```toml
+environment = "test"
+[server]
+port = 0  # Random port for tests
 
-In production, services use Docker container networking:
-- `DATABASE_URL`: `postgres://postgres:${POSTGRES_PASSWORD}@db:5432`
-- `REDIS_HOST_NAME`: `redis`
-- Environment variables injected via GitHub Actions secrets
+[redis]
+database = 1  # Isolated test database
 
-### Redis Configuration
+[auth]
+jwt_expiration = 60           # 1 minute (fast testing)
+jwt_cookie_name = "jwt_test"
+```
 
-The application uses:
-- **Database 0**: Production data (banned tokens, 2FA codes)
-- **Database 1**: Test data (isolated during testing)
-- **TTL Settings**: 2FA codes expire after 10 minutes
+**Production** (`config/production.toml`):
+```toml
+environment = "production"
+[server]
+host = "0.0.0.0"
+port = 3000
+
+[redis]
+host = "redis"  # Docker service name
+max_connections = 20
+
+[auth]
+jwt_expiration = 7200         # 2 hours
+refresh_token_expiration = 2592000  # 30 days
+```
+
+### Environment Variable Configuration
+
+**Modern Approach (Recommended):**
+```bash
+# Hierarchical configuration with AUTH_ prefix
+export AUTH_DATABASE__URL="postgres://user:pass@localhost:5432/auth"
+export AUTH_REDIS__HOST="localhost"
+export AUTH_AUTH__JWT_SECRET="your-secret-key"
+export ENVIRONMENT="development"
+```
+
+**Legacy Compatibility (Still Supported):**
+```bash
+# Existing environment variables continue to work
+export DATABASE_URL="postgres://postgres:SecurePass2024!@localhost:5432/auth"
+export REDIS_HOST_NAME="localhost"
+export JWT_SECRET="g4iNvB23GraeR2d1SsIDL9lxqynITs/8c9JOSL0BvY5aR6a1Lv69gl1Gq0N6vJLY5ntgpRg3WOvzqXVojUGdBA=="
+export POSTGRES_PASSWORD="SecurePass2024!"
+```
+
+### Configuration Structure
+
+```rust
+AppConfig {
+  environment: String,           // development, test, production
+  server: {
+    host: String,               // Server bind address
+    port: u16,                  // Server port
+  },
+  database: {
+    url: String,                // PostgreSQL connection URL
+    max_connections: u32,       // Connection pool size
+    connection_timeout: u64,    // Timeout in seconds
+  },
+  redis: {
+    host: String,               // Redis hostname
+    port: u16,                  // Redis port (default: 6379)
+    database: u8,               // Redis database number
+    password: Option<String>,   // Optional Redis password
+  },
+  auth: {
+    jwt_secret: String,         // JWT signing secret (validated length)
+    jwt_expiration: u64,        // JWT token lifetime (seconds)
+    refresh_token_expiration: u64,  // Refresh token lifetime
+    jwt_cookie_name: String,    // JWT cookie name
+    two_fa_code_expiration: u64,    // 2FA code lifetime
+  }
+}
+```
 
 ## 📁 Project Structure
 
 ```
 ├── auth-service/          # Authentication microservice
+│   ├── config/            # Configuration files
+│   │   ├── default.toml   # Base configuration
+│   │   ├── development.toml # Development settings
+│   │   ├── test.toml      # Test environment settings
+│   │   └── production.toml # Production settings
 │   ├── src/
+│   │   ├── config.rs      # Configuration types and loading
 │   │   ├── domain/        # Business logic and data types
 │   │   ├── routes/        # API endpoints
 │   │   ├── services/      # Data stores and external services
-│   │   └── utils/         # Utilities and constants
+│   │   └── utils/         # Utilities and auth services
 │   ├── tests/             # Integration tests
 │   └── Dockerfile
 ├── app-service/           # Frontend application service  
 ├── compose.yml            # Docker Compose configuration
 └── README.md
+```
+
+## ⚙️ Configuration Benefits
+
+### Modern Configuration Management
+- **Type Safety**: Configuration validated at startup with descriptive error messages
+- **Environment Profiles**: Seamless switching between development, test, and production
+- **Hierarchical Loading**: File-based configs with environment variable overrides
+- **Validation**: Automatic validation of JWT secret length, database URLs, etc.
+- **Backward Compatibility**: Existing environment variables continue to work
+
+### Configuration Examples
+
+**Quick Development Setup:**
+```bash
+# Set environment and required secrets
+export ENVIRONMENT=development
+export DATABASE_URL="postgres://postgres:SecurePass2024!@localhost:5432/auth"
+export JWT_SECRET="your-development-secret-key-here"
+cargo run
+```
+
+**Testing with Isolated Environment:**
+```bash
+# Test environment uses Redis database 1 and shorter token expiration
+export ENVIRONMENT=test
+export DATABASE_URL="postgres://postgres:SecurePass2024!@localhost:5432/auth_test"
+export JWT_SECRET="test-secret-key-minimum-32-characters"
+cargo test
+```
+
+**Production Deployment:**
+```bash
+# Production uses optimized settings from config/production.toml
+export ENVIRONMENT=production
+export AUTH_DATABASE__URL="postgres://prod_user:secure_pass@db:5432/prod_auth"
+export AUTH_REDIS__HOST="redis-cluster"
+export AUTH_AUTH__JWT_SECRET="${PRODUCTION_JWT_SECRET}"
 ```
 
 ## 🔐 Security Features
@@ -268,6 +394,43 @@ cargo test --test api -- --nocapture
 - gRPC regression tests in `tests/api/grpc_regression.rs`
 
 ## 🔧 Troubleshooting
+
+### Configuration Issues
+
+**Environment Variable Not Found:**
+```bash
+# Check if required variables are set
+echo $ENVIRONMENT
+echo $DATABASE_URL
+echo $JWT_SECRET
+
+# Verify configuration loading
+export ENVIRONMENT=development
+cargo run 2>&1 | grep -i config
+```
+
+**Invalid Configuration Values:**
+```bash
+# JWT secret too short (minimum 32 characters)
+export JWT_SECRET="your-secret-key-must-be-at-least-32-characters"
+
+# Invalid database URL format  
+export DATABASE_URL="postgres://user:pass@localhost:5432/dbname"
+
+# Invalid Redis configuration
+export AUTH_REDIS__HOST="localhost"
+export AUTH_REDIS__PORT="6379" 
+```
+
+**Configuration File Not Found:**
+```bash
+# Ensure config files exist
+ls -la config/
+# Should show: default.toml, development.toml, test.toml, production.toml
+
+# Verify TOML syntax
+toml-lint config/development.toml  # if toml-lint is installed
+```
 
 ### Common Issues
 

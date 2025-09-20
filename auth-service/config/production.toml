@@ -1,0 +1,27 @@
+# Production environment configuration
+environment = "production"
+
+[server]
+# Production server settings
+host = "0.0.0.0"
+port = 3000
+
+[database]
+# Production database with higher connection limits
+max_connections = 20
+connection_timeout = 60
+
+[redis]
+# Production Redis configuration
+host = "redis"  # Docker service name
+port = 6379
+database = 0
+max_connections = 20
+connection_timeout = 10
+
+[auth]
+# Production JWT settings (longer expiration for better UX)
+jwt_expiration = 7200         # 2 hours
+refresh_token_expiration = 2592000  # 30 days
+jwt_cookie_name = "jwt"
+two_fa_code_expiration = 600  # 10 minutes
