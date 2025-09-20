@@ -89,6 +89,15 @@ cd auth-service
 DATABASE_URL='postgres://postgres:SecurePass2024!@localhost:5432' cargo test
 ```
 
+### CI/CD Testing
+The GitHub Actions workflow runs comprehensive tests against real database containers:
+- **PostgreSQL 15.2-alpine** service container for integration tests
+- **Redis 7.0-alpine** service container for 2FA functionality
+- **Health checks** ensure databases are ready before tests run
+- **SQLx offline mode** for faster compilation while maintaining database testing
+
+This approach ensures what's tested in CI is exactly what runs in production.
+
 ### Run Specific Test Categories
 ```bash
 # Integration tests (REST & gRPC)
@@ -123,16 +132,28 @@ curl -i -X POST http://localhost:3000/login \
 
 ## 🔧 Configuration
 
-### Environment Variables
+### Local Development Environment Variables
 
 - `DATABASE_URL`: PostgreSQL connection string (required)
 - `REDIS_HOST_NAME`: Redis host (default: localhost)
+- `JWT_SECRET`: Secret key for JWT token signing
+- `POSTGRES_PASSWORD`: PostgreSQL database password
 
-Example:
+Example `.env` file:
 ```bash
-export DATABASE_URL='postgres://postgres:SecurePass2024!@localhost:5432'
-export REDIS_HOST_NAME='localhost'
+DATABASE_URL=postgres://postgres:SecurePass2024!@localhost:5432/auth
+REDIS_HOST_NAME=localhost
+JWT_SECRET=g4iNvB23GraeR2d1SsIDL9lxqynITs/8c9JOSL0BvY5aR6a1Lv69gl1Gq0N6vJLY5ntgpRg3WOvzqXVojUGdBA==
+POSTGRES_PASSWORD=SecurePass2024!
+SQLX_OFFLINE=true
 ```
+
+### Production Environment (Docker Compose)
+
+In production, services use Docker container networking:
+- `DATABASE_URL`: `postgres://postgres:${POSTGRES_PASSWORD}@db:5432`
+- `REDIS_HOST_NAME`: `redis`
+- Environment variables injected via GitHub Actions secrets
 
 ### Redis Configuration
 
@@ -167,10 +188,57 @@ The application uses:
 
 ## 🚀 Production Deployment
 
-1. **Environment Setup**: Configure production DATABASE_URL and REDIS_HOST_NAME
-2. **Database Migration**: Automatic SQLx migrations on startup
-3. **Health Monitoring**: Use `/health` endpoint for load balancer checks
-4. **Graceful Shutdown**: Supports SIGTERM for zero-downtime deployments
+### Local Docker Compose
+```bash
+# Start complete stack locally (PostgreSQL + Redis + Services + Caddy)
+docker compose up --build -d
+
+# Access services through Caddy reverse proxy
+curl http://localhost/auth/health        # Auth service
+curl http://localhost/                   # App service
+```
+
+### DigitalOcean Deployment
+
+This project includes automated deployment to DigitalOcean via GitHub Actions.
+
+#### Required GitHub Secrets
+Configure these in **Settings → Secrets and variables → Actions**:
+
+**Secrets:**
+- `POSTGRES_PASSWORD`: Database password (e.g., `SecurePass2024!`)
+- `JWT_SECRET`: JWT signing key (see `.env` file for example)
+- `DOCKER_USERNAME`: Your Docker Hub username
+- `DOCKER_PASSWORD`: Your Docker Hub password/token
+- `DROPLET_PASSWORD`: DigitalOcean droplet root password
+
+**Variables:**
+- `DROPLET_IP`: Your DigitalOcean droplet's public IP address
+
+#### Deployment Process
+
+1. **Push to main branch** triggers automatic deployment
+2. **CI Pipeline**: 
+   - Tests run against real PostgreSQL and Redis containers
+   - Docker images built and pushed to Docker Hub
+3. **Production Deployment**:
+   - Services deployed to DigitalOcean droplet
+   - PostgreSQL, Redis, auth-service, app-service, and Caddy containers
+   - Automatic SSL certificates via Caddy
+   - Database migrations run automatically
+
+#### Post-Deployment
+
+- **App Service**: `https://your-droplet-ip/`
+- **Auth API**: `https://your-droplet-ip/auth/health`
+- **Health Monitoring**: Use `/health` endpoints for load balancer checks
+- **Graceful Shutdown**: Supports SIGTERM for zero-downtime deployments
+
+#### DigitalOcean Droplet Requirements
+- Ubuntu 20.04+ with Docker and Docker Compose installed
+- Root SSH access enabled
+- Ports 80 and 443 open for web traffic
+- At least 2GB RAM (recommended for PostgreSQL + Redis + services)
 
 ## 📚 API Documentation
 
@@ -198,3 +266,34 @@ cargo test --test api -- --nocapture
 - [`auth-service/QUICK_TEST.md`](auth-service/QUICK_TEST.md): Quick API verification commands
 - Integration test examples in `auth-service/tests/api/`
 - gRPC regression tests in `tests/api/grpc_regression.rs`
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**Database Connection Errors:**
+```bash
+# Ensure PostgreSQL is running
+docker ps | grep postgres
+
+# Check connection
+psql postgres://postgres:SecurePass2024!@localhost:5432 -c "SELECT 1;"
+```
+
+**Redis Connection Errors:**
+```bash
+# Ensure Redis is running  
+docker ps | grep redis
+
+# Test Redis connection
+redis-cli -h localhost -p 6379 ping
+```
+
+**GitHub Actions Deployment Failures:**
+- Verify all required secrets are configured in GitHub repository settings
+- Check droplet has sufficient disk space and Docker is installed
+- Ensure droplet ports 80/443 are open for Caddy reverse proxy
+
+**SQLx Compilation Issues:**
+- Use `SQLX_OFFLINE=true` for offline compilation
+- Run `cargo sqlx prepare` to generate query metadata when database schema changes

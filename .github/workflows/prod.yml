@@ -7,9 +7,39 @@ on:
       - main
   workflow_dispatch:
 
+# Global environment variables for SQLx offline mode
+env:
+  SQLX_OFFLINE: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # Service containers for testing with real PostgreSQL and Redis
+    services:
+      postgres:
+        image: postgres:15.2-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7.0-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
 
     steps:
       # Checkout code from the repository
@@ -29,7 +59,11 @@ jobs:
         restore-keys: ${{ runner.os }}-cargo-
 
     - name: Install Rust
-      run: rustup update stable && rustup default stable
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
 
 
     - name: Install protoc (protobuf-compiler)
@@ -43,9 +77,10 @@ jobs:
 
     - name: Build and test auth-service code
       working-directory: ./auth-service
+      env:
+        DATABASE_URL: postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/postgres
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
       run: |
-        export JWT_SECRET=${{ secrets.JWT_SECRET }}
-        export SQLX_OFFLINE=true
         cargo build --verbose
         cargo test --verbose
 
@@ -122,6 +157,7 @@ jobs:
           fi
           export JWT_SECRET=${{ secrets.JWT_SECRET }}
           export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
+          export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           docker compose down || true
           docker compose pull
           docker compose up -d
