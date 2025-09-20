@@ -8,7 +8,6 @@ use auth_service::app_state::{AppState, UserStoreType};
 use auth_service::services::data_stores::postgres_user_store::PostgresUserStore;
 use auth_service::services::data_stores::redis_banned_token_store::RedisBannedTokenStore;
 use auth_service::grpc;
-use auth_service::services::two_fa_code_store_factory::default_two_fa_code_store;
 use auth_service::utils::constants::{DATABASE_URL, REDIS_HOST_NAME};
 use tonic::transport::Server;
 use sqlx::PgPool;
@@ -24,8 +23,8 @@ async fn main() {
     let redis_pool = configure_redis().await;
 
     let user_store: UserStoreType = Arc::new(tokio::sync::RwLock::new(PostgresUserStore::new(pg_pool)));
-    let banned_token_store = Arc::new(RedisBannedTokenStore::new(Arc::new(redis_pool)));
-    let two_fa_code_store = default_two_fa_code_store();
+    let banned_token_store = Arc::new(RedisBannedTokenStore::new(Arc::new(redis_pool.clone())));
+    let two_fa_code_store = auth_service::services::two_fa_code_store_factory::redis_two_fa_code_store(Arc::new(redis_pool));
     use auth_service::services::mock_email_client::MockEmailClient;
     let email_client = Arc::new(MockEmailClient);
     let app_state = Arc::new(AppState::new(user_store, banned_token_store, two_fa_code_store, email_client));

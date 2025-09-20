@@ -2,7 +2,6 @@
 async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
     use crate::helpers::TestApp;
     use auth_service::domain::Email;
-    use auth_service::domain::data_stores::TwoFACodeStore;
     use auth_service::routes::login::TwoFactorAuthResponseRest;
 
     let app = TestApp::new().await;
@@ -33,6 +32,7 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
         .unwrap();
     assert_eq!(stored_login_attempt_id.as_ref(), json_body.login_attempt_id);
 }
+
 use auth_service::utils::constants::JWT_COOKIE_NAME;
 #[tokio::test]
 async fn should_return_500_if_internal_error() {

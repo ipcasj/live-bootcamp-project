@@ -16,7 +16,7 @@ use std::sync::Arc;
 use crate::{
 	app_state::AppState,
 	domain::{AuthAPIError, Email},
-	domain::data_stores::{LoginAttemptId, TwoFACode, TwoFACodeStore},
+	domain::data_stores::{LoginAttemptId, TwoFACode},
 	utils::auth::generate_auth_cookie,
 };
 use std::time::{SystemTime, UNIX_EPOCH};

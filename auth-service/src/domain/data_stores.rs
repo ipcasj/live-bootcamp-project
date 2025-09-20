@@ -1,5 +1,5 @@
 #[async_trait::async_trait]
-pub trait TwoFACodeStore {
+pub trait TwoFACodeStore: Send + Sync {
     async fn add_code(
         &mut self,
         email: Email,

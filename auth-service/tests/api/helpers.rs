@@ -99,7 +99,7 @@ pub struct TestApp {
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
     pub banned_token_store: Arc<RedisBannedTokenStore>,
-    pub two_fa_code_store: Arc<tokio::sync::RwLock<auth_service::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeStore>>,
+    pub two_fa_code_store: auth_service::app_state::TwoFACodeStoreType,
     pub db_name: String,
     pub redis_db: u32,
     pub redis_pool: Arc<RedisPool>,
@@ -128,9 +128,9 @@ impl TestApp {
             .expect("Failed to execute request")
     }
     pub async fn new() -> Self {
-        use auth_service::app_state::{AppState, UserStoreType};
+        use auth_service::app_state::{AppState, UserStoreType, TwoFACodeStoreType};
         use auth_service::services::data_stores::postgres_user_store::PostgresUserStore;
-        use auth_service::services::data_stores::hashmap_two_fa_code_store::HashmapTwoFACodeStore;
+        use auth_service::services::two_fa_code_store_factory;
         use auth_service::routes;
         use axum::{Router, routing::post};
         use tower_http::services::ServeDir;
@@ -148,7 +148,7 @@ impl TestApp {
         
         let user_store: UserStoreType = Arc::new(RwLock::new(PostgresUserStore::new(db_pool)));
         let banned_token_store = Arc::new(RedisBannedTokenStore::new(redis_pool.clone()));
-        let two_fa_code_store = Arc::new(RwLock::new(HashmapTwoFACodeStore::default()));
+        let two_fa_code_store: TwoFACodeStoreType = two_fa_code_store_factory::redis_two_fa_code_store(redis_pool.clone());
         use auth_service::services::mock_email_client::MockEmailClient;
         let email_client = Arc::new(MockEmailClient);
         let app_state = Arc::new(AppState::new(user_store.clone(), banned_token_store.clone(), two_fa_code_store.clone(), email_client));

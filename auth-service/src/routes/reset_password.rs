@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::{
     app_state::AppState,
     domain::{AuthAPIError, Email, Password},
-    domain::data_stores::{TwoFACodeStore, LoginAttemptId, TwoFACode},
+    domain::data_stores::{LoginAttemptId, TwoFACode},
 };
 
 #[derive(Deserialize)]
