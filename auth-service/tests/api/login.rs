@@ -33,7 +33,8 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
     assert_eq!(stored_login_attempt_id.as_ref(), json_body.login_attempt_id);
 }
 
-use auth_service::utils::constants::JWT_COOKIE_NAME;
+use auth_service::utils::auth::JWT_COOKIE_NAME;
+
 #[tokio::test]
 async fn should_return_500_if_internal_error() {
     let app = TestApp::new().await;
@@ -43,7 +44,7 @@ async fn should_return_500_if_internal_error() {
 
 use crate::helpers::TestApp;
 
-// use auth_service::{utils::constants::JWT_COOKIE_NAME, ErrorResponse}; // unused
+
 
 #[tokio::test]
 async fn should_return_422_if_malformed_credentials() {
@@ -84,7 +85,7 @@ async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
     assert_eq!(login_response.status().as_u16(), 200);
     let auth_cookie = login_response
         .cookies()
-        .find(|cookie| cookie.name() == JWT_COOKIE_NAME)
+        .find(|cookie| cookie.name() == &*JWT_COOKIE_NAME)
         .expect("No auth cookie found");
     assert!(!auth_cookie.value().is_empty());
 }

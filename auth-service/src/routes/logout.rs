@@ -1,7 +1,6 @@
 use axum::{http::{StatusCode, header}, response::IntoResponse, extract::State};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
 use crate::domain::AuthAPIError;
-use crate::utils::constants::JWT_COOKIE_NAME;
 use crate::utils::auth::validate_token;
 use crate::app_state::AppState;
 use std::sync::Arc;
@@ -12,7 +11,8 @@ pub async fn logout(
 	State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
 	// 400: No cookie present
-	let jwt_cookie = jar.get(JWT_COOKIE_NAME);
+	let jwt_cookie_name = &state.config.auth.jwt_cookie_name;
+	let jwt_cookie = jar.get(jwt_cookie_name);
 	if jwt_cookie.is_none() {
 		return Err(AuthAPIError::MissingToken); // 400
 	}
@@ -30,7 +30,7 @@ pub async fn logout(
 			// Ban the token on logout
 			state.banned_token_store.ban_token(token.to_string()).await;
 			// 200: Success, clear cookie
-			let mut expired = Cookie::new(JWT_COOKIE_NAME, "");
+			let mut expired = Cookie::new(jwt_cookie_name, "");
 			expired.set_path("/");
 			expired.set_http_only(true);
 			expired.set_max_age(time::Duration::seconds(0));

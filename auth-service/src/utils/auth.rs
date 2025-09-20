@@ -2,13 +2,26 @@ use axum_extra::extract::cookie::{Cookie, SameSite};
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
+use once_cell::sync::Lazy;
+use std::sync::Arc;
 
 use crate::domain::email::Email;
+use crate::config::AppConfig;
 
-use super::constants::{JWT_COOKIE_NAME, JWT_SECRET, REFRESH_TOKEN_SECRET, REFRESH_TOKEN_TTL_SECONDS};
+// Lazy-loaded configuration for legacy compatibility
+static LEGACY_CONFIG: Lazy<AppConfig> = Lazy::new(|| {
+    AppConfig::load().expect("Failed to load configuration for legacy auth functions")
+});
+
+// Legacy constants using configuration
+pub static JWT_COOKIE_NAME: Lazy<String> = Lazy::new(|| LEGACY_CONFIG.auth.jwt_cookie_name.clone());
+static JWT_SECRET: Lazy<String> = Lazy::new(|| LEGACY_CONFIG.auth.jwt_secret.clone());
+static REFRESH_TOKEN_SECRET: Lazy<String> = Lazy::new(|| LEGACY_CONFIG.auth.refresh_token_secret.clone());
+static REFRESH_TOKEN_TTL_SECONDS: Lazy<i64> = Lazy::new(|| LEGACY_CONFIG.auth.refresh_token_expiration as i64);
+static TOKEN_TTL_SECONDS: Lazy<i64> = Lazy::new(|| LEGACY_CONFIG.auth.jwt_expiration as i64);
 // Create refresh token
 pub fn generate_refresh_token(email: &Email) -> Result<String, GenerateTokenError> {
-    let delta = chrono::Duration::try_seconds(REFRESH_TOKEN_TTL_SECONDS)
+    let delta = chrono::Duration::try_seconds(*REFRESH_TOKEN_TTL_SECONDS)
         .ok_or(GenerateTokenError::UnexpectedError)?;
     let exp = Utc::now()
         .checked_add_signed(delta)
@@ -52,7 +65,7 @@ pub fn generate_auth_cookie(email: &Email) -> Result<Cookie<'static>, GenerateTo
 
 // Create cookie and set the value to the passed-in token string 
 fn create_auth_cookie(token: String) -> Cookie<'static> {
-    let mut cookie = Cookie::new(JWT_COOKIE_NAME, token);
+    let mut cookie = Cookie::new(&*JWT_COOKIE_NAME, token);
     cookie.set_path("/");
     cookie.set_http_only(true);
     cookie.set_same_site(SameSite::Lax);
@@ -65,14 +78,10 @@ pub enum GenerateTokenError {
     UnexpectedError,
 }
 
-// DEPRECATED: Use config.auth.jwt_expiration instead
-// This value determines how long the JWT auth token is valid for
-#[deprecated(note = "Use config.auth.jwt_expiration instead")]
-pub const TOKEN_TTL_SECONDS: i64 = 600; // 10 minutes
 
 // Create JWT auth token
 fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
-    let delta = chrono::Duration::try_seconds(TOKEN_TTL_SECONDS)
+    let delta = chrono::Duration::try_seconds(*TOKEN_TTL_SECONDS)
         .ok_or(GenerateTokenError::UnexpectedError)?;
 
     // Create JWT expiration time
@@ -101,7 +110,6 @@ pub fn generate_auth_token_from_str(email: &str) -> Result<String, GenerateToken
 
 // Check if JWT auth token is valid by decoding it using the JWT secret
 use crate::domain::data_stores::BannedTokenStore;
-use std::sync::Arc;
 use crate::domain::AuthAPIError;
 
 pub async fn validate_token(token: &str, banned_token_store: Option<Arc<dyn BannedTokenStore>>) -> Result<Claims, AuthAPIError> {
@@ -142,7 +150,7 @@ mod tests {
     async fn test_generate_auth_cookie() {
     let email = Email::parse("test@example.com").unwrap();
         let cookie = generate_auth_cookie(&email).unwrap();
-        assert_eq!(cookie.name(), JWT_COOKIE_NAME);
+        assert_eq!(cookie.name(), &*JWT_COOKIE_NAME);
         assert_eq!(cookie.value().split('.').count(), 3);
         assert_eq!(cookie.path(), Some("/"));
         assert_eq!(cookie.http_only(), Some(true));
@@ -153,7 +161,7 @@ mod tests {
     async fn test_create_auth_cookie() {
         let token = "test_token".to_owned();
         let cookie = create_auth_cookie(token.clone());
-        assert_eq!(cookie.name(), JWT_COOKIE_NAME);
+        assert_eq!(cookie.name(), &*JWT_COOKIE_NAME);
         assert_eq!(cookie.value(), token);
         assert_eq!(cookie.path(), Some("/"));
         assert_eq!(cookie.http_only(), Some(true));

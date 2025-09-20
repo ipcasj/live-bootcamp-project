@@ -7,13 +7,14 @@ use tokio::sync::{oneshot, RwLock};
 use sqlx::{PgConnection, Connection, Executor};
 use sqlx::postgres::PgConnectOptions;
 use std::str::FromStr;
-use auth_service::utils::constants::DATABASE_URL;
+use auth_service::config::AppConfig;
 use auth_service::{get_redis_pool, get_postgres_pool};
 use auth_service::services::data_stores::redis_banned_token_store::{RedisBannedTokenStore, RedisPool};
 
 // Helper function to delete a test database
 async fn delete_database(db_name: &str) {
-    let postgresql_conn_url: String = DATABASE_URL.to_owned();
+    let config = AppConfig::load().expect("Failed to load configuration");
+    let postgresql_conn_url: String = config.database.url.to_owned();
 
     let connection_options = PgConnectOptions::from_str(&postgresql_conn_url)
         .expect("Failed to parse PostgreSQL connection string");
@@ -48,7 +49,8 @@ async fn delete_database(db_name: &str) {
 
 // Helper function to create a test database
 async fn create_database(db_name: &str) -> sqlx::Pool<sqlx::Postgres> {
-    let postgresql_conn_url: String = DATABASE_URL.to_owned();
+    let config = AppConfig::load().expect("Failed to load configuration");
+    let postgresql_conn_url: String = config.database.url.to_owned();
 
     let connection_options = PgConnectOptions::from_str(&postgresql_conn_url)
         .expect("Failed to parse PostgreSQL connection string");

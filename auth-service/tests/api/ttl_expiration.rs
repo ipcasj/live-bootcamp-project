@@ -1,7 +1,7 @@
 use std::time::Duration;
 use tokio::time::sleep;
 use crate::helpers::TestApp;
-use auth_service::utils::constants::JWT_COOKIE_NAME;
+use auth_service::utils::auth::JWT_COOKIE_NAME;
 
 #[tokio::test]
 async fn test_banned_token_ttl_expiration() {
@@ -23,7 +23,7 @@ async fn test_banned_token_ttl_expiration() {
         .headers()
         .get_all("set-cookie")
         .iter()
-        .find(|cookie| cookie.to_str().unwrap().starts_with(&format!("{}=", JWT_COOKIE_NAME)))
+        .find(|cookie| cookie.to_str().unwrap().starts_with(&format!("{}=", &*JWT_COOKIE_NAME)))
         .expect("Should have auth cookie");
     
     let token = auth_cookie

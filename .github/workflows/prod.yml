@@ -79,7 +79,9 @@ jobs:
       working-directory: ./auth-service
       env:
         DATABASE_URL: postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/postgres
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        JWT_SECRET: test_jwt_secret_key_that_is_32_characters_long_for_github_ci_testing
+        ENVIRONMENT: test
+        SQLX_OFFLINE: true
       run: |
         cargo build --verbose
         cargo test --verbose
