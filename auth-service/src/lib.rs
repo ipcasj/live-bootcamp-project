@@ -144,12 +144,11 @@ impl Application {
     pub async fn build(app_state: Arc<AppState>, address: &str, shutdown_signal: Option<tokio::sync::oneshot::Receiver<()>>) -> Result<Self, Box<dyn Error>> {
     use utoipa::OpenApi;
     use axum::routing::get;
-    let openapi = crate::api_doc::ApiDoc::openapi();
-    let openapi_json = serde_json::to_string(&openapi).unwrap();
-    use tower_http::trace::TraceLayer;
-    use tower_http::catch_panic::CatchPanicLayer;
     use axum::middleware::from_fn;
     use uuid::Uuid;
+    
+    let openapi = crate::api_doc::ApiDoc::openapi();
+    let openapi_json = serde_json::to_string(&openapi).unwrap();
 
         // Middleware to inject a trace_id into each request span
     async fn add_trace_id<B>(req: axum::http::Request<B>, next: axum::middleware::Next<B>) -> axum::response::Response {
@@ -200,9 +199,7 @@ impl Application {
             .with_state(app_state.clone());
         let router = router
             .layer(cors)
-            .layer(from_fn(add_trace_id))
-            .layer(CatchPanicLayer::new())
-            .layer(TraceLayer::new_for_http());
+            .layer(from_fn(add_trace_id));
 
     let std_listener = std::net::TcpListener::bind(address)?;
     std_listener.set_nonblocking(true)?;
@@ -213,10 +210,15 @@ impl Application {
     }
 
     pub async fn run(self) -> Result<(), hyper::Error> {
-        println!("listening on {}", &self.address);
-    if let Some(shutdown_signal) = self.shutdown_signal {
+        tracing::info!(
+            address = %self.address,
+            "🌐 Auth service listening and ready to accept connections"
+        );
+        
+        if let Some(shutdown_signal) = self.shutdown_signal {
             self.server.with_graceful_shutdown(async move {
                 let _ = shutdown_signal.await;
+                tracing::info!("🛑 Graceful shutdown signal received");
             }).await
         } else {
             self.server.await

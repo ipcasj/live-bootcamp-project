@@ -1,27 +1,31 @@
 //! Binary entry point for the auth-service.
 //!
-//! - Initializes logging and application state.
+//! - Initializes comprehensive tracing and observability.
 //! - Starts the Axum server with modern configuration management.
-use tracing_subscriber;
 use auth_service::{Application, get_postgres_pool, get_redis_pool};
 use auth_service::app_state::{AppState, UserStoreType};
 use auth_service::services::data_stores::postgres_user_store::PostgresUserStore;
 use auth_service::services::data_stores::redis_banned_token_store::RedisBannedTokenStore;
 use auth_service::grpc;
 use auth_service::config::AppConfig;
+use auth_service::utils::tracing::init_tracing;
 use tonic::transport::Server;
 use sqlx::PgPool;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
-    // Initialize tracing subscriber for structured logging
-    tracing_subscriber::fmt::init();
+    // Initialize comprehensive tracing and observability
+    init_tracing();
 
     // Load configuration from multiple sources
     let config = AppConfig::load().expect("Failed to load configuration");
     
-    tracing::info!("Starting auth-service with configuration: environment={}", config.environment);
+    tracing::info!(
+        version = env!("CARGO_PKG_VERSION"),
+        environment = %config.environment,
+        "🚀 Starting auth-service"
+    );
 
     // Configure PostgreSQL and Redis connections with config
     let pg_pool = configure_postgresql(&config).await;

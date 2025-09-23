@@ -65,6 +65,7 @@ pub struct SignupResponseRest {
 )]
 /// Signup endpoint for user registration.
 
+#[tracing::instrument(name = "User Signup", skip_all, err(Debug))]
 pub async fn signup(
     State(state): State<Arc<AppState>>,
     Json(request): Json<SignupRequestRest>,
