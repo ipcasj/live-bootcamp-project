@@ -10,6 +10,7 @@ use crate::utils::auth::generate_auth_cookie;
 use serde::Serialize;
 use serde::Deserialize;
 use crate::ErrorResponse;
+use color_eyre::eyre;
 // use anyhow::anyhow; // unused
 
 
@@ -53,14 +54,14 @@ pub async fn login(
 
 	if email.is_none() || password.is_none() {
 		// 422 for missing/malformed fields
-		return AuthAPIError::MalformedCredentials.into_response();
+		return AuthAPIError::InvalidCredentials.into_response();
 	}
 	let email = email.unwrap();
 	let password = password.unwrap();
 
 	// Simulate 500 for test
 	if email == "trigger500@example.com" {
-		return AuthAPIError::UnexpectedError(anyhow::anyhow!("triggered 500 by email")).into_response();
+		return AuthAPIError::UnexpectedError(eyre::eyre!("triggered 500 by email")).into_response();
 	}
 
 	// 400 for invalid format (bad email/password)
@@ -89,12 +90,12 @@ pub async fn login(
 		let login_attempt_id = LoginAttemptId::default();
 		let two_fa_code = TwoFACode::default();
 		if let Err(_) = TwoFACodeStore::add_code(&mut *state.two_fa_code_store.write().await, email.clone(), login_attempt_id.clone(), two_fa_code.clone()).await {
-			return AuthAPIError::UnexpectedError(anyhow::anyhow!("Failed to store 2FA code")).into_response();
+			return AuthAPIError::UnexpectedError(eyre::eyre!("Failed to store 2FA code")).into_response();
 		}
 		// Send code to user via email client
 		if let Err(e) = state.email_client.send_2fa_code(email.as_ref(), two_fa_code.as_ref()).await {
 			tracing::error!(?e, "Failed to send 2FA code via email client");
-			return AuthAPIError::UnexpectedError(anyhow::anyhow!("Failed to send 2FA code")).into_response();
+			return AuthAPIError::UnexpectedError(eyre::eyre!("Failed to send 2FA code")).into_response();
 		}
 		let response = TwoFactorAuthResponseRest {
 			message: "2FA required".to_owned(),
@@ -114,7 +115,7 @@ pub async fn login(
 	// No 2FA: proceed as normal
 	let auth_cookie = match generate_auth_cookie(&email) {
 		Ok(cookie) => cookie,
-		Err(_) => return AuthAPIError::UnexpectedError(anyhow::anyhow!("Failed to generate JWT")).into_response(),
+		Err(_) => return AuthAPIError::UnexpectedError(eyre::eyre!("Failed to generate JWT")).into_response(),
 	};
 	let mut response = StatusCode::OK.into_response();
 	response.headers_mut().append(

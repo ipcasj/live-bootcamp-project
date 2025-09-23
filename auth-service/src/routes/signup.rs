@@ -31,6 +31,7 @@ use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::{app_state::AppState, domain::{User, AuthAPIError}};
+use color_eyre::eyre;
 use std::sync::Arc;
 
 
@@ -74,7 +75,7 @@ pub async fn signup(
     if let Err(e) = request.validate() {
         error!(?e, "Malformed signup input");
         // Return 422 for missing/invalid fields
-        return Err(AuthAPIError::MalformedCredentials);
+        return Err(AuthAPIError::InvalidCredentials);
     }
 
     // Parse and validate email and password using newtypes
@@ -99,7 +100,7 @@ pub async fn signup(
     // Simulate a user store failure for test trigger
     if user.email.as_ref() == "trigger500@example.com" {
         error!(email = %user.email.as_ref(), "Simulated user store failure");
-        return Err(AuthAPIError::UnexpectedError(anyhow::anyhow!("Simulated user store failure")));
+        return Err(AuthAPIError::UnexpectedError(eyre::eyre!("Simulated user store failure")));
     }
     // Early return AuthAPIError::UserAlreadyExists if email exists in user_store.
     if user_store.get_user(&user.email).await.is_ok() {
@@ -110,7 +111,7 @@ pub async fn signup(
     let user_email = user.email.as_ref().to_owned();
     if let Err(e) = user_store.add_user(user.clone()).await {
         error!(?e, "Unexpected error adding user");
-        return Err(AuthAPIError::UnexpectedError(anyhow::anyhow!("Unexpected error adding user: {:?}", e)));
+        return Err(AuthAPIError::UnexpectedError(eyre::eyre!("Unexpected error adding user: {:?}", e)));
     }
 
     info!(email = %user_email, "User created successfully");

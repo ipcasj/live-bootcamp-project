@@ -45,7 +45,7 @@ pub fn generate_refresh_token_from_str(email: &str) -> Result<String, GenerateTo
 pub async fn validate_refresh_token(token: &str, banned_token_store: Option<Arc<dyn BannedTokenStore>>) -> Result<Claims, AuthAPIError> {
     if let Some(store) = banned_token_store {
         if store.is_banned(token).await {
-            return Err(AuthAPIError::BannedToken);
+            return Err(AuthAPIError::InvalidToken);
         }
     }
     decode::<Claims>(
@@ -115,7 +115,7 @@ use crate::domain::AuthAPIError;
 pub async fn validate_token(token: &str, banned_token_store: Option<Arc<dyn BannedTokenStore>>) -> Result<Claims, AuthAPIError> {
     if let Some(store) = banned_token_store {
         if store.is_banned(token).await {
-            return Err(AuthAPIError::BannedToken);
+            return Err(AuthAPIError::InvalidToken);
         }
     }
     decode::<Claims>(

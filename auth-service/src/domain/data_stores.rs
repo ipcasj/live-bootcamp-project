@@ -104,10 +104,26 @@ pub trait UserStore: Send + Sync + Any {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum UserStoreError {
+    #[error("User already exists")]
     UserAlreadyExists,
+    #[error("User not found")]
     UserNotFound,
+    #[error("Invalid credentials")]
     InvalidCredentials,
-    UnexpectedError,
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] color_eyre::Report),
+}
+
+impl PartialEq for UserStoreError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (UserStoreError::UserAlreadyExists, UserStoreError::UserAlreadyExists) => true,
+            (UserStoreError::UserNotFound, UserStoreError::UserNotFound) => true,
+            (UserStoreError::InvalidCredentials, UserStoreError::InvalidCredentials) => true,
+            (UserStoreError::UnexpectedError(_), UserStoreError::UnexpectedError(_)) => true,
+            _ => false,
+        }
+    }
 }

@@ -15,8 +15,8 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
-    // Initialize comprehensive tracing and observability
-    init_tracing();
+    color_eyre::install().expect("Failed to install color_eyre");
+    init_tracing().expect("Failed to initialize tracing");
 
     // Load configuration from multiple sources
     let config = AppConfig::load().expect("Failed to load configuration");
