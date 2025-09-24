@@ -30,7 +30,7 @@ pub async fn delete_account(
 	};
 	user_store.delete_user(&email).await.map_err(|e| match e {
 		crate::domain::UserStoreError::UserNotFound => AuthAPIError::InvalidCredentials,
-		_ => AuthAPIError::UnexpectedError(anyhow::anyhow!("Unexpected error deleting user")),
+		_ => AuthAPIError::UnexpectedError(color_eyre::eyre::eyre!("Unexpected error deleting user")),
 	})?;
 	Ok(Json(DeleteAccountResponse { message: "Account deleted".to_string() }))
 }

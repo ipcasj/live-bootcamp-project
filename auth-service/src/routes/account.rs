@@ -70,7 +70,7 @@ pub async fn update_2fa_setting(
         user.two_fa_method = method.clone();
     }
     let two_fa_method = user.two_fa_method.clone();
-    user_store.update_user(user).await.map_err(|_| AuthAPIError::UnexpectedError(anyhow::anyhow!("Failed to update user")))?;
+    user_store.update_user(user).await.map_err(|_| AuthAPIError::UnexpectedError(color_eyre::eyre::eyre!("Failed to update user")))?;
     Ok(axum::Json(AccountSettingsResponse {
         requires_2fa: payload.requires_2fa,
         two_fa_method,

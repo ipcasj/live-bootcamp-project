@@ -54,7 +54,7 @@ pub async fn login(
 
 	if email.is_none() || password.is_none() {
 		// 422 for missing/malformed fields
-		return AuthAPIError::InvalidCredentials.into_response();
+		return AuthAPIError::MalformedCredentials.into_response();
 	}
 	let email = email.unwrap();
 	let password = password.unwrap();

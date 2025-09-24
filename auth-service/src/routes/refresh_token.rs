@@ -21,9 +21,9 @@ pub async fn refresh_token(
     // Issue new access and refresh tokens
     let email = claims.sub;
     let new_access_token = generate_auth_token_from_str(&email)
-        .map_err(|_| AuthAPIError::UnexpectedError(anyhow::anyhow!("Failed to generate access token")))?;
+        .map_err(|_| AuthAPIError::UnexpectedError(color_eyre::eyre::eyre!("Failed to generate access token")))?;
     let new_refresh_token = generate_refresh_token_from_str(&email)
-        .map_err(|_| AuthAPIError::UnexpectedError(anyhow::anyhow!("Failed to generate refresh token")))?;
+        .map_err(|_| AuthAPIError::UnexpectedError(color_eyre::eyre::eyre!("Failed to generate refresh token")))?;
     Ok(Json(serde_json::json!({
         "access_token": new_access_token,
         "refresh_token": new_refresh_token

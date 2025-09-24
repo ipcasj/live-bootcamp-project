@@ -74,8 +74,8 @@ pub async fn signup(
     // Validate input using validator crate
     if let Err(e) = request.validate() {
         error!(?e, "Malformed signup input");
-        // Return 422 for missing/invalid fields
-        return Err(AuthAPIError::InvalidCredentials);
+        // Return 400 for missing/invalid fields
+        return Err(AuthAPIError::MalformedCredentials);
     }
 
     // Parse and validate email and password using newtypes
@@ -83,14 +83,14 @@ pub async fn signup(
         Ok(e) => e,
         Err(_) => {
             error!(email = %request.email, "Invalid email format");
-            return Err(AuthAPIError::InvalidCredentials);
+            return Err(AuthAPIError::MalformedCredentials);
         }
     };
     let password = match crate::domain::Password::parse(&request.password) {
         Ok(p) => p,
         Err(_) => {
             error!("Invalid password format");
-            return Err(AuthAPIError::InvalidCredentials);
+            return Err(AuthAPIError::MalformedCredentials);
         }
     };
 

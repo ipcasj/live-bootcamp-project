@@ -6,7 +6,7 @@ use argon2::{
 };
 
 use sqlx::PgPool;
-use color_eyre::{Result, eyre::eyre, eyre::Context};
+use color_eyre::{Result, eyre::Context};
 
 use crate::domain::{
     data_stores::{UserStore, UserStoreError},
@@ -244,7 +244,7 @@ async fn compute_password_hash(password: String) -> Result<String> {
     let result = tokio::task::spawn_blocking(move || {
         current_span.in_scope(|| {
             let salt: SaltString = SaltString::generate(&mut rand::thread_rng());
-            let _password_hash = Argon2::new(
+            let password_hash = Argon2::new(
                 Algorithm::Argon2id,
                 Version::V0x13,
                 Params::new(15000, 2, 1, None)?,
@@ -252,8 +252,7 @@ async fn compute_password_hash(password: String) -> Result<String> {
             .hash_password(password.as_bytes(), &salt)?
             .to_string();
 
-            // Ok(password_hash)
-            Err(eyre!("oh no!")) // New! - Forced error for testing
+            Ok(password_hash)
         })
     })
     .await;

@@ -21,7 +21,7 @@ pub async fn logout(
 
 	// Special test case: trigger 500 error for testing
 	if token == "trigger500" {
-		return Err(AuthAPIError::UnexpectedError(anyhow::anyhow!("triggered 500 by token")));
+		return Err(AuthAPIError::UnexpectedError(color_eyre::eyre::eyre!("triggered 500 by token")));
 	}
 
 	// 401: Invalid/expired token or banned

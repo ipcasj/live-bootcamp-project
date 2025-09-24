@@ -153,7 +153,7 @@ pub async fn verify_2fa(
 
 	// Set JWT cookie
 	let auth_cookie = generate_auth_cookie(&email)
-		.map_err(|_| AuthAPIError::UnexpectedError(anyhow::anyhow!("Failed to generate JWT")))?;
+		.map_err(|_| AuthAPIError::UnexpectedError(color_eyre::eyre::eyre!("Failed to generate JWT")))?;
 	let mut response = StatusCode::OK.into_response();
 	response.headers_mut().append(
 		header::SET_COOKIE,

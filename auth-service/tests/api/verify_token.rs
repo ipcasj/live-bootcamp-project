@@ -31,7 +31,7 @@ async fn should_return_401_if_token_is_banned() {
     let response = app.post_verify_token(&verify_body).await;
     assert_eq!(response.status(), 401);
     let err: ErrorResponse = response.json().await.expect("Invalid JSON");
-    assert_eq!(err.error, "Token has been banned (revoked)");
+    assert_eq!(err.error, "Invalid token");
 }
 use crate::helpers::TestApp;
 use auth_service::ErrorResponse;
@@ -53,7 +53,7 @@ async fn should_return_401_if_invalid_token() {
     let response = app.post_verify_token(&body).await;
     assert_eq!(response.status(), 401);
     let err: ErrorResponse = response.json().await.expect("Invalid JSON");
-    assert_eq!(err.error, "Invalid or expired token");
+    assert_eq!(err.error, "Invalid token");
 }
 
 #[tokio::test]

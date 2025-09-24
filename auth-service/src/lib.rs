@@ -57,6 +57,7 @@ impl IntoResponse for AuthAPIError {
         let (status, error_message) = match &self {
             AuthAPIError::UserAlreadyExists => (StatusCode::CONFLICT, self.to_string()),
             AuthAPIError::InvalidCredentials => (StatusCode::BAD_REQUEST, self.to_string()),
+            AuthAPIError::MalformedCredentials => (StatusCode::UNPROCESSABLE_ENTITY, self.to_string()),
             AuthAPIError::IncorrectCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
             AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, self.to_string()),
             AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, self.to_string()),
@@ -181,16 +182,16 @@ impl Application {
 
         let router = Router::new()
             .route("/signup", post(routes::signup::signup))
-            // .route("/login", post(routes::login::login))
-            // .route("/logout", post(routes::logout::logout))
-            // .route("/verify-2fa", post(routes::verify_2fa::verify_2fa))
-            // .route("/verify-token", post(routes::verify_token::verify_token))
-            // .route("/refresh-token", post(routes::refresh_token::refresh_token))
-            // .route("/forgot-password", post(routes::reset_password::forgot_password))
-            // .route("/reset-password", post(routes::reset_password::reset_password))
-            // .route("/delete-account", axum::routing::delete(routes::auth::delete_account))
-            // .route("/account/settings", axum::routing::get(routes::account::get_account_settings))
-            // .route("/account/settings", axum::routing::patch(routes::account::update_2fa_setting))
+            .route("/login", post(routes::login::login))
+            .route("/logout", post(routes::logout::logout))
+            .route("/verify-2fa", post(routes::verify_2fa::verify_2fa))
+            .route("/verify-token", post(routes::verify_token::verify_token))
+            .route("/refresh-token", post(routes::refresh_token::refresh_token))
+            .route("/forgot-password", post(routes::reset_password::forgot_password))
+            .route("/reset-password", post(routes::reset_password::reset_password))
+            .route("/delete-account", axum::routing::delete(routes::auth::delete_account))
+            .route("/account/settings", axum::routing::get(routes::account::get_account_settings))
+            .route("/account/settings", axum::routing::patch(routes::account::update_2fa_setting))
             .route("/health", axum::routing::get(routes::signup::health))
             .route("/openapi.json", get(|| async move { openapi_json }))
             .fallback_service(
