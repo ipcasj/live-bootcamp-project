@@ -1,6 +1,7 @@
 //! Password type for validated passwords.
 
 use argon2::{self, password_hash::{PasswordHash, PasswordVerifier}, Argon2};
+use color_eyre::eyre::{eyre, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Password(String); // Stores plaintext password for validation
@@ -14,9 +15,9 @@ pub enum PasswordParseError {
 
 impl Password {
     /// Validate a password and return it if valid (does not hash).
-    pub fn parse(s: &str) -> Result<Self, PasswordParseError> {
+    pub fn parse(s: &str) -> Result<Self> {
         if s.len() < 8 {
-            return Err(PasswordParseError::TooShort);
+            return Err(eyre!("Password must be at least 8 characters"));
         }
         Ok(Password(s.to_string()))
     }

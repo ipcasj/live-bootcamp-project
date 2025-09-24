@@ -6,6 +6,7 @@ use crate::app_state::AppState;
 use std::sync::Arc;
 
 /// Contract-compliant logout route: clears JWT cookie, returns 400/401/200 as required.
+#[tracing::instrument(skip_all)]
 pub async fn logout(
 	jar: CookieJar,
 	State(state): State<Arc<AppState>>,
@@ -25,10 +26,12 @@ pub async fn logout(
 	}
 
 	// 401: Invalid/expired token or banned
-	match validate_token(token, Some(state.banned_token_store.clone())).await {
+	match validate_token(token, state.banned_token_store.clone()).await {
 		Ok(_) => {
 			// Ban the token on logout
-			state.banned_token_store.ban_token(token.to_string()).await;
+			if let Err(e) = state.banned_token_store.write().await.add_token(token.to_string()).await {
+				return Err(AuthAPIError::UnexpectedError(e.into()));
+			}
 			// 200: Success, clear cookie
 			let mut expired = Cookie::new(jwt_cookie_name, "");
 			expired.set_path("/");
@@ -36,6 +39,6 @@ pub async fn logout(
 			expired.set_max_age(time::Duration::seconds(0));
 			Ok((StatusCode::OK, [(header::SET_COOKIE, expired.to_string())]))
 		}
-		Err(e) => Err(e), // 401/403
+		Err(_) => Err(AuthAPIError::InvalidToken), // 401 for invalid token
 	}
 }

@@ -1,4 +1,4 @@
-use auth_service::domain::data_stores::BannedTokenStore;
+
 use auth_service::utils::auth::JWT_COOKIE_NAME;
 use crate::helpers::TestApp;
 
@@ -56,7 +56,8 @@ async fn logout_should_clear_cookie_on_success() {
     let cookies: Vec<_> = response.headers().get_all("set-cookie").iter().collect();
     assert!(cookies.iter().any(|c| c.to_str().unwrap().contains(&format!("{}=;", &*JWT_COOKIE_NAME))));
     // Check that the token is banned
-    assert!(app.banned_token_store.is_banned(token).await);
+    let banned = app.banned_token_store.read().await.contains_token(token).await.unwrap();
+    assert!(banned);
     
     app.cleanup().await;
 }

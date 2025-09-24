@@ -42,6 +42,7 @@ pub struct AuditLogEntry {
 }
 static AUDIT_LOG: Lazy<Mutex<Vec<AuditLogEntry>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
+#[tracing::instrument(skip_all)]
 pub async fn verify_2fa(
 	State(state): State<Arc<AppState>>,
 	jar: CookieJar,

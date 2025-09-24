@@ -1,5 +1,6 @@
 //! Email type for validated email addresses.
 use validator::ValidateEmail;
+use color_eyre::eyre::{eyre, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Email(String);
@@ -12,11 +13,11 @@ pub enum EmailParseError {
 
 impl Email {
     /// Attempts to parse and validate an email address.
-    pub fn parse(s: &str) -> Result<Self, EmailParseError> {
+    pub fn parse(s: &str) -> Result<Self> {
         if s.validate_email() {
             Ok(Email(s.to_owned()))
         } else {
-            Err(EmailParseError::InvalidFormat)
+            Err(eyre!("Invalid email format"))
         }
     }
 }

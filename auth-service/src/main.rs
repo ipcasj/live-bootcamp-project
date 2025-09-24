@@ -3,7 +3,7 @@
 //! - Initializes comprehensive tracing and observability.
 //! - Starts the Axum server with modern configuration management.
 use auth_service::{Application, get_postgres_pool, get_redis_pool};
-use auth_service::app_state::{AppState, UserStoreType};
+use auth_service::app_state::{AppState, UserStoreType, BannedTokenStoreType};
 use auth_service::services::data_stores::postgres_user_store::PostgresUserStore;
 use auth_service::services::data_stores::redis_banned_token_store::RedisBannedTokenStore;
 use auth_service::grpc;
@@ -33,7 +33,7 @@ async fn main() {
 
     let config_arc = Arc::new(config);
     let user_store: UserStoreType = Arc::new(tokio::sync::RwLock::new(PostgresUserStore::new(pg_pool)));
-    let banned_token_store = Arc::new(RedisBannedTokenStore::new(Arc::new(redis_pool.clone()), config_arc.clone()));
+    let banned_token_store: BannedTokenStoreType = Arc::new(tokio::sync::RwLock::new(RedisBannedTokenStore::new(Arc::new(redis_pool.clone()), config_arc.clone())));
     let two_fa_code_store = auth_service::services::two_fa_code_store_factory::redis_two_fa_code_store(Arc::new(redis_pool), config_arc.clone());
     use auth_service::services::mock_email_client::MockEmailClient;
     let email_client = Arc::new(MockEmailClient);

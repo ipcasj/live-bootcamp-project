@@ -9,10 +9,18 @@ use sqlx::postgres::PgConnectOptions;
 use std::str::FromStr;
 use auth_service::config::AppConfig;
 use auth_service::{get_redis_pool, get_postgres_pool};
+use auth_service::app_state::{BannedTokenStoreType, TwoFACodeStoreType, UserStoreType, AppState};
 use auth_service::services::data_stores::redis_banned_token_store::{RedisBannedTokenStore, RedisPool};
 
 // Helper function to delete a test database
 async fn delete_database(db_name: &str) {
+    // Set test environment variables to match CI configuration
+    std::env::set_var("ENVIRONMENT", "test");
+    std::env::set_var("DATABASE_URL", "postgres://postgres:SecurePass2024!@localhost:5432/postgres");
+    std::env::set_var("JWT_SECRET", "test_jwt_secret_key_that_is_32_characters_long_for_github_ci_testing");
+    std::env::set_var("REDIS_HOST_NAME", "localhost");
+    std::env::set_var("SQLX_OFFLINE", "true");
+    
     let config = AppConfig::load().expect("Failed to load configuration");
     let postgresql_conn_url: String = config.database.url.to_owned();
 
@@ -49,6 +57,13 @@ async fn delete_database(db_name: &str) {
 
 // Helper function to create a test database
 async fn create_database(db_name: &str) -> sqlx::Pool<sqlx::Postgres> {
+    // Set test environment variables to match CI configuration
+    std::env::set_var("ENVIRONMENT", "test");
+    std::env::set_var("DATABASE_URL", "postgres://postgres:SecurePass2024!@localhost:5432/postgres");
+    std::env::set_var("JWT_SECRET", "test_jwt_secret_key_that_is_32_characters_long_for_github_ci_testing");
+    std::env::set_var("REDIS_HOST_NAME", "localhost");
+    std::env::set_var("SQLX_OFFLINE", "true");
+    
     let config = AppConfig::load().expect("Failed to load configuration");
     let postgresql_conn_url: String = config.database.url.to_owned();
 
@@ -110,7 +125,7 @@ pub struct TestApp {
     pub address: String,
     pub cookie_jar: Arc<Jar>,
     pub http_client: reqwest::Client,
-    pub banned_token_store: Arc<RedisBannedTokenStore>,
+    pub banned_token_store: BannedTokenStoreType,
     pub two_fa_code_store: auth_service::app_state::TwoFACodeStoreType,
     pub db_name: String,
     pub redis_db: u32,
@@ -140,7 +155,13 @@ impl TestApp {
             .expect("Failed to execute request")
     }
     pub async fn new() -> Self {
-        use auth_service::app_state::{AppState, UserStoreType, TwoFACodeStoreType};
+        // Set test environment variables to match CI configuration
+        std::env::set_var("ENVIRONMENT", "test");
+        std::env::set_var("DATABASE_URL", "postgres://postgres:SecurePass2024!@localhost:5432/postgres");
+        std::env::set_var("JWT_SECRET", "test_jwt_secret_key_that_is_32_characters_long_for_github_ci_testing");
+        std::env::set_var("REDIS_HOST_NAME", "localhost");
+        std::env::set_var("SQLX_OFFLINE", "true");
+        
         use auth_service::services::data_stores::postgres_user_store::PostgresUserStore;
         use auth_service::services::two_fa_code_store_factory;
         use auth_service::routes;
@@ -163,7 +184,7 @@ impl TestApp {
         let test_config = Arc::new(AppConfig::load().expect("Failed to load test configuration"));
         
         let user_store: UserStoreType = Arc::new(RwLock::new(PostgresUserStore::new(db_pool)));
-        let banned_token_store = Arc::new(RedisBannedTokenStore::new(redis_pool.clone(), test_config.clone()));
+        let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(RedisBannedTokenStore::new(redis_pool.clone(), test_config.clone())));
         let two_fa_code_store: TwoFACodeStoreType = two_fa_code_store_factory::redis_two_fa_code_store(redis_pool.clone(), test_config.clone());
         use auth_service::services::mock_email_client::MockEmailClient;
         let email_client = Arc::new(MockEmailClient);

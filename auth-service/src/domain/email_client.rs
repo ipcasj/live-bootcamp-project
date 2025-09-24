@@ -4,7 +4,9 @@ use async_trait::async_trait;
 #[async_trait]
 pub trait EmailClient: Send + Sync + 'static {
     /// Send a 2FA code to the given email address.
-    async fn send_2fa_code(&self, email: &str, code: &str) -> Result<(), EmailClientError>;
+    async fn send_2fa_code(&self, email: &str, code: &str) -> color_eyre::Result<()>;
+    /// Send an email with custom subject and body.
+    async fn send_email(&self, email: &crate::domain::Email, subject: &str, body: &str) -> color_eyre::Result<()>;
 }
 
 #[derive(Debug, thiserror::Error)]

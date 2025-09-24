@@ -97,12 +97,13 @@ pub mod app_state {
 
     use crate::domain::data_stores::BannedTokenStore;
 
+    pub type BannedTokenStoreType = Arc<RwLock<dyn BannedTokenStore + Send + Sync>>;
     pub type TwoFACodeStoreType = Arc<tokio::sync::RwLock<dyn crate::domain::data_stores::TwoFACodeStore + Send + Sync>>;
 
     #[derive(Clone)]
     pub struct AppState {
         pub user_store: UserStoreType,
-        pub banned_token_store: Arc<dyn BannedTokenStore>,
+        pub banned_token_store: BannedTokenStoreType,
         pub two_fa_code_store: TwoFACodeStoreType,
         pub email_client: Arc<dyn crate::domain::email_client::EmailClient>,
         pub config: Arc<crate::config::AppConfig>,
@@ -111,7 +112,7 @@ pub mod app_state {
     impl AppState {
         pub fn new(
             user_store: UserStoreType,
-            banned_token_store: Arc<dyn BannedTokenStore>,
+            banned_token_store: BannedTokenStoreType,
             two_fa_code_store: TwoFACodeStoreType,
             email_client: Arc<dyn crate::domain::email_client::EmailClient>,
             config: Arc<crate::config::AppConfig>,

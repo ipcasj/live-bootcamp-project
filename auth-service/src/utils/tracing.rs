@@ -65,8 +65,14 @@ pub fn init_tracing() -> Result<()> {
 /// 
 /// ```rust
 /// use auth_service::utils::tracing::make_span_with_request_id;
-/// use axum::extract::Request;
+/// use http::Request;
+/// use hyper::Body;
 /// 
+/// let request = Request::builder()
+///     .method("GET")
+///     .uri("/test")
+///     .body(Body::empty())
+///     .unwrap();
 /// let span = make_span_with_request_id(&request);
 /// // Span contains request_id, method, uri, etc.
 /// ```

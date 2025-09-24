@@ -24,20 +24,32 @@ pub trait TwoFACodeStore: Send + Sync {
     async fn get_failed_attempts(&self, email: &Email) -> u32;
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 pub enum TwoFACodeStoreError {
+    #[error("Login Attempt ID not found")]
     LoginAttemptIdNotFound,
-    UnexpectedError,
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] color_eyre::Report),
+}
+
+impl PartialEq for TwoFACodeStoreError {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::LoginAttemptIdNotFound, Self::LoginAttemptIdNotFound)
+                | (Self::UnexpectedError(_), Self::UnexpectedError(_))
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoginAttemptId(String);
 
 impl LoginAttemptId {
-    pub fn parse(id: String) -> Result<Self, String> {
-        uuid::Uuid::parse_str(&id)
-            .map(|_| LoginAttemptId(id))
-            .map_err(|_| "Invalid UUID".to_string())
+    pub fn parse(id: String) -> color_eyre::Result<Self> {
+        let parsed_id = uuid::Uuid::parse_str(&id)
+            .wrap_err("Invalid login attempt id")?;
+        Ok(Self(parsed_id.to_string()))
     }
 }
 
@@ -57,12 +69,18 @@ impl AsRef<str> for LoginAttemptId {
 pub struct TwoFACode(String);
 
 impl TwoFACode {
-    pub fn parse(code: String) -> Result<Self, String> {
-        if code.len() == 6 && code.chars().all(|c| c.is_ascii_digit()) {
-            Ok(TwoFACode(code))
-        } else {
-            Err("Invalid 2FA code".to_string())
+    pub fn parse(code: String) -> color_eyre::Result<Self> {
+        // 2FA codes should be exactly 6 digits
+        if code.len() != 6 {
+            return Err(color_eyre::eyre::eyre!("2FA code must be exactly 6 digits"));
         }
+        
+        // Check if all characters are digits
+        if !code.chars().all(|c| c.is_ascii_digit()) {
+            return Err(color_eyre::eyre::eyre!("2FA code must contain only digits"));
+        }
+
+        Ok(Self(code))
     }
 }
 
@@ -79,11 +97,18 @@ impl AsRef<str> for TwoFACode {
     }
 }
 use async_trait::async_trait;
+use color_eyre::eyre::Context;
 
 #[async_trait]
 pub trait BannedTokenStore: Send + Sync {
-    async fn ban_token(&self, token: String);
-    async fn is_banned(&self, token: &str) -> bool;
+    async fn add_token(&mut self, token: String) -> Result<(), BannedTokenStoreError>;
+    async fn contains_token(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum BannedTokenStoreError {
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] color_eyre::Report),
 }
 // Data store abstractions and errors for user storage in the auth-service.
 /// Trait for async user store implementations.

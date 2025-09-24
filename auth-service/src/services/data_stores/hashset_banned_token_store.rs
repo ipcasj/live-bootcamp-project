@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::domain::data_stores::BannedTokenStore;
+use crate::domain::data_stores::{BannedTokenStore, BannedTokenStoreError};
 use async_trait::async_trait;
 
 pub struct HashsetBannedTokenStore {
@@ -18,12 +18,13 @@ impl Default for HashsetBannedTokenStore {
 
 #[async_trait]
 impl BannedTokenStore for HashsetBannedTokenStore {
-    async fn ban_token(&self, token: String) {
+    async fn add_token(&mut self, token: String) -> Result<(), BannedTokenStoreError> {
         self.tokens.write().await.insert(token);
+        Ok(())
     }
 
-    async fn is_banned(&self, token: &str) -> bool {
-        self.tokens.read().await.contains(token)
+    async fn contains_token(&self, token: &str) -> Result<bool, BannedTokenStoreError> {
+        Ok(self.tokens.read().await.contains(token))
     }
 }
 
@@ -32,11 +33,11 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_ban_and_check() {
-        let store = HashsetBannedTokenStore::default();
+    async fn test_add_and_check() {
+        let mut store = HashsetBannedTokenStore::default();
         let token = "abc123".to_string();
-        assert!(!store.is_banned(&token).await);
-        store.ban_token(token.clone()).await;
-        assert!(store.is_banned(&token).await);
+        assert!(!store.contains_token(&token).await.unwrap());
+        store.add_token(token.clone()).await.unwrap();
+        assert!(store.contains_token(&token).await.unwrap());
     }
 }

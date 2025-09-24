@@ -44,6 +44,7 @@ pub enum LoginResponseRest {
 		(status = 500, description = "Unexpected error", body = ErrorResponse)
 	)
 )]
+#[tracing::instrument(skip_all)]
 pub async fn login(
 	State(state): State<Arc<AppState>>,
 	Json(payload): Json<serde_json::Value>,
@@ -86,41 +87,67 @@ pub async fn login(
 
 	// Handle request based on user's 2FA configuration
 	if user.requires_2fa {
-		use crate::domain::data_stores::TwoFACodeStore;
-		let login_attempt_id = LoginAttemptId::default();
-		let two_fa_code = TwoFACode::default();
-		if let Err(_) = TwoFACodeStore::add_code(&mut *state.two_fa_code_store.write().await, email.clone(), login_attempt_id.clone(), two_fa_code.clone()).await {
-			return AuthAPIError::UnexpectedError(eyre::eyre!("Failed to store 2FA code")).into_response();
-		}
-		// Send code to user via email client
-		if let Err(e) = state.email_client.send_2fa_code(email.as_ref(), two_fa_code.as_ref()).await {
-			tracing::error!(?e, "Failed to send 2FA code via email client");
-			return AuthAPIError::UnexpectedError(eyre::eyre!("Failed to send 2FA code")).into_response();
-		}
-		let response = TwoFactorAuthResponseRest {
-			message: "2FA required".to_owned(),
-			login_attempt_id: login_attempt_id.as_ref().to_owned(),
-		};
-			// axum 0.6 does not implement IntoResponse for (StatusCode, Json<T>), so do it manually
-			let mut resp = StatusCode::PARTIAL_CONTENT.into_response();
-		// Serialize the inner type, not axum::Json
-		*resp.body_mut() = axum::body::boxed(axum::body::Full::from(serde_json::to_vec(&LoginResponseRest::TwoFactorAuth(response)).unwrap()));
-			resp.headers_mut().insert(
-				axum::http::header::CONTENT_TYPE,
-				axum::http::HeaderValue::from_static("application/json"),
-			);
-			return resp;
+		handle_2fa(&email, &state).await.into_response()
+	} else {
+		handle_no_2fa(&email).await.into_response()
+	}
+}
+
+#[tracing::instrument(skip_all)]
+async fn handle_2fa(
+	email: &Email,
+	state: &AppState,
+) -> Result<impl IntoResponse, AuthAPIError> {
+	let login_attempt_id = LoginAttemptId::default();
+	let two_fa_code = TwoFACode::default();
+
+	if let Err(e) = state
+		.two_fa_code_store
+		.write()
+		.await
+		.add_code(email.clone(), login_attempt_id.clone(), two_fa_code.clone())
+		.await
+	{
+		return Err(AuthAPIError::UnexpectedError(e.into()));
 	}
 
-	// No 2FA: proceed as normal
-	let auth_cookie = match generate_auth_cookie(&email) {
-		Ok(cookie) => cookie,
-		Err(_) => return AuthAPIError::UnexpectedError(eyre::eyre!("Failed to generate JWT")).into_response(),
+	if let Err(e) = state
+		.email_client
+		.send_email(email, "2FA Code", two_fa_code.as_ref())
+		.await
+	{
+		return Err(AuthAPIError::UnexpectedError(e));
+	}
+
+	let response = TwoFactorAuthResponseRest {
+		message: "2FA required".to_owned(),
+		login_attempt_id: login_attempt_id.as_ref().to_owned(),
 	};
+	
+	// axum 0.6 does not implement IntoResponse for (StatusCode, Json<T>), so do it manually
+	let mut resp = StatusCode::PARTIAL_CONTENT.into_response();
+	// Serialize the inner type, not axum::Json
+	*resp.body_mut() = axum::body::boxed(axum::body::Full::from(serde_json::to_vec(&LoginResponseRest::TwoFactorAuth(response)).unwrap()));
+	resp.headers_mut().insert(
+		axum::http::header::CONTENT_TYPE,
+		axum::http::HeaderValue::from_static("application/json"),
+	);
+	Ok(resp)
+}
+
+#[tracing::instrument(skip_all)]
+async fn handle_no_2fa(
+	email: &Email,
+) -> Result<impl IntoResponse, AuthAPIError> {
+	let auth_cookie = match generate_auth_cookie(email) {
+		Ok(cookie) => cookie,
+		Err(e) => return Err(AuthAPIError::UnexpectedError(e)),
+	};
+	
 	let mut response = StatusCode::OK.into_response();
 	response.headers_mut().append(
 		header::SET_COOKIE,
 		header::HeaderValue::from_str(&auth_cookie.to_string()).unwrap(),
 	);
-	response
+	Ok(response)
 }
