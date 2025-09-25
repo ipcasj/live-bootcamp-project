@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use bb8_redis::redis;
+use bb8_redis::redis::AsyncCommands;
 use bb8_redis::bb8::Pool;
 use bb8_redis::RedisConnectionManager;
 use async_trait::async_trait;
-use color_eyre::eyre::Context;
+use secrecy::{Secret, ExposeSecret};
 
 use crate::{
     domain::data_stores::{BannedTokenStore, BannedTokenStoreError},
@@ -28,48 +28,33 @@ impl RedisBannedTokenStore {
 #[async_trait]
 impl BannedTokenStore for RedisBannedTokenStore {
     #[tracing::instrument(skip_all)]
-    async fn add_token(&mut self, token: String) -> Result<(), BannedTokenStoreError> {
-        let token_key = get_key(token.as_str());
-
-        let value = true;
-
-        let ttl: u64 = self.config.auth.banned_token_ttl
-            .try_into()
-            .wrap_err("failed to cast banned_token_ttl to u64")
-            .map_err(BannedTokenStoreError::UnexpectedError)?;
-
-        let mut conn = self.pool.get().await
-            .wrap_err("failed to get Redis connection")
-            .map_err(BannedTokenStoreError::UnexpectedError)?;
-
-        let _: () = redis::cmd("SETEX")
-            .arg(&token_key)
-            .arg(ttl)
-            .arg(value)
-            .query_async(&mut *conn)
+    async fn add_token(&mut self, token: Secret<String>) -> Result<(), BannedTokenStoreError> {
+        let mut conn = self.pool
+            .get()
             .await
-            .wrap_err("failed to set banned token in Redis")
-            .map_err(BannedTokenStoreError::UnexpectedError)?;
+            .map_err(|e| BannedTokenStoreError::UnexpectedError(e.into()))?;
+
+        let _: () = conn
+            .set_ex(&get_key(token.expose_secret()), 1, self.config.auth.banned_token_ttl)
+            .await
+            .map_err(|e| BannedTokenStoreError::UnexpectedError(e.into()))?;
 
         Ok(())
     }
 
     #[tracing::instrument(skip_all)]
-    async fn contains_token(&self, token: &str) -> Result<bool, BannedTokenStoreError> {
-        let token_key = get_key(token);
-
-        let mut conn = self.pool.get().await
-            .wrap_err("failed to get Redis connection")
-            .map_err(BannedTokenStoreError::UnexpectedError)?;
-
-        let is_banned: bool = redis::cmd("EXISTS")
-            .arg(&token_key)
-            .query_async(&mut *conn)
+    async fn contains_token(&self, token: &Secret<String>) -> Result<bool, BannedTokenStoreError> {
+        let mut conn = self.pool
+            .get()
             .await
-            .wrap_err("failed to check if token exists in Redis")
-            .map_err(BannedTokenStoreError::UnexpectedError)?;
+            .map_err(|e| BannedTokenStoreError::UnexpectedError(e.into()))?;
 
-        Ok(is_banned)
+        let exists: bool = conn
+            .exists(&get_key(token.expose_secret()))
+            .await
+            .map_err(|e| BannedTokenStoreError::UnexpectedError(e.into()))?;
+
+        Ok(exists)
     }
 }
 

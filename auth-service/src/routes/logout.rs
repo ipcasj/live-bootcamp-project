@@ -1,5 +1,6 @@
 use axum::{http::{StatusCode, header}, response::IntoResponse, extract::State};
 use axum_extra::extract::cookie::{Cookie, CookieJar};
+use secrecy::Secret;
 use crate::domain::AuthAPIError;
 use crate::utils::auth::validate_token;
 use crate::app_state::AppState;
@@ -29,7 +30,7 @@ pub async fn logout(
 	match validate_token(token, state.banned_token_store.clone()).await {
 		Ok(_) => {
 			// Ban the token on logout
-			if let Err(e) = state.banned_token_store.write().await.add_token(token.to_string()).await {
+			if let Err(e) = state.banned_token_store.write().await.add_token(Secret::new(token.to_string())).await {
 				return Err(AuthAPIError::UnexpectedError(e.into()));
 			}
 			// 200: Success, clear cookie

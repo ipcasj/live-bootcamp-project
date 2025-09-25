@@ -3,6 +3,7 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
     use crate::helpers::TestApp;
     use auth_service::domain::Email;
     use auth_service::routes::login::TwoFactorAuthResponseRest;
+    use secrecy::ExposeSecret;
 
     let app = TestApp::new().await;
     let email = TestApp::get_random_email();
@@ -27,10 +28,10 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
         .two_fa_code_store
         .read()
         .await
-        .get_code(&Email::parse(&email).unwrap())
+        .get_code(&Email::parse_from_str(&email).unwrap())
         .await
         .unwrap();
-    assert_eq!(stored_login_attempt_id.as_ref(), json_body.login_attempt_id);
+    assert_eq!(stored_login_attempt_id.as_ref().expose_secret(), &json_body.login_attempt_id);
 }
 
 use auth_service::utils::auth::JWT_COOKIE_NAME;

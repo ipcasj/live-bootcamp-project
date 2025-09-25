@@ -24,7 +24,7 @@ pub async fn delete_account(
 	user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, AuthAPIError> {
 	let mut user_store = state.user_store.write().await;
-	let email = match crate::domain::Email::parse(&user.email) {
+	    let email = match crate::domain::Email::parse_from_str(&user.email) {
 		Ok(e) => e,
 		Err(_) => return Err(AuthAPIError::InvalidCredentials),
 	};

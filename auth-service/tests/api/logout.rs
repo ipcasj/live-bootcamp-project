@@ -56,7 +56,8 @@ async fn logout_should_clear_cookie_on_success() {
     let cookies: Vec<_> = response.headers().get_all("set-cookie").iter().collect();
     assert!(cookies.iter().any(|c| c.to_str().unwrap().contains(&format!("{}=;", &*JWT_COOKIE_NAME))));
     // Check that the token is banned
-    let banned = app.banned_token_store.read().await.contains_token(token).await.unwrap();
+    use secrecy::Secret;
+    let banned = app.banned_token_store.read().await.contains_token(&Secret::new(token.to_string())).await.unwrap();
     assert!(banned);
     
     app.cleanup().await;

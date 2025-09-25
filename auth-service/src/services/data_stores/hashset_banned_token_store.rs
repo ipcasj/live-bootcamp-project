@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use secrecy::{Secret, ExposeSecret};
 use crate::domain::data_stores::{BannedTokenStore, BannedTokenStoreError};
 use async_trait::async_trait;
 
@@ -18,13 +19,15 @@ impl Default for HashsetBannedTokenStore {
 
 #[async_trait]
 impl BannedTokenStore for HashsetBannedTokenStore {
-    async fn add_token(&mut self, token: String) -> Result<(), BannedTokenStoreError> {
-        self.tokens.write().await.insert(token);
+    async fn add_token(&mut self, token: Secret<String>) -> Result<(), BannedTokenStoreError> {
+        let mut tokens = self.tokens.write().await;
+        tokens.insert(token.expose_secret().clone());
         Ok(())
     }
 
-    async fn contains_token(&self, token: &str) -> Result<bool, BannedTokenStoreError> {
-        Ok(self.tokens.read().await.contains(token))
+    async fn contains_token(&self, token: &Secret<String>) -> Result<bool, BannedTokenStoreError> {
+        let tokens = self.tokens.read().await;
+        Ok(tokens.contains(token.expose_secret()))
     }
 }
 
@@ -35,7 +38,7 @@ mod tests {
     #[tokio::test]
     async fn test_add_and_check() {
         let mut store = HashsetBannedTokenStore::default();
-        let token = "abc123".to_string();
+        let token = Secret::new("abc123".to_string());
         assert!(!store.contains_token(&token).await.unwrap());
         store.add_token(token.clone()).await.unwrap();
         assert!(store.contains_token(&token).await.unwrap());

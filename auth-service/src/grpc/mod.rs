@@ -22,11 +22,11 @@ impl crate::auth::auth_service_server::AuthService for MyAuthService {
         let req = request.into_inner();
         let trace_id = uuid::Uuid::new_v4();
         // Validate email and password
-        let email = Email::parse(&req.email).map_err(|_| {
+        let email = Email::parse_from_str(&req.email).map_err(|_| {
             tracing::error!(%trace_id, "Invalid email");
             tonic::Status::invalid_argument("Invalid email")
         })?;
-        let password = Password::parse(&req.password).map_err(|_| {
+        let password = Password::parse_from_str(&req.password).map_err(|_| {
             tracing::error!(%trace_id, "Invalid password");
             tonic::Status::invalid_argument("Invalid password")
         })?;
@@ -51,7 +51,7 @@ impl crate::auth::auth_service_server::AuthService for MyAuthService {
     ) -> Result<tonic::Response<crate::auth::LoginResponse>, tonic::Status> {
         let req = request.into_inner();
         let trace_id = uuid::Uuid::new_v4();
-        let email = Email::parse(&req.email).map_err(|_| {
+        let email = Email::parse_from_str(&req.email).map_err(|_| {
             tracing::error!(%trace_id, "Invalid email");
             tonic::Status::invalid_argument("Invalid email")
         })?;

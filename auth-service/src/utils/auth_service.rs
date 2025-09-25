@@ -3,6 +3,7 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use secrecy::{Secret, ExposeSecret};
 
 use crate::config::AppConfig;
 use crate::domain::email::Email;
@@ -53,7 +54,7 @@ impl AuthService {
             .ok_or(GenerateTokenError::UnexpectedError)?
             .timestamp();
         let exp: usize = exp.try_into().map_err(|_| GenerateTokenError::UnexpectedError)?;
-        let sub = email.as_ref().to_owned();
+        let sub = email.as_ref().expose_secret().clone();
         let claims = Claims { sub, exp };
         
         encode(
@@ -72,7 +73,7 @@ impl AuthService {
             .ok_or(GenerateTokenError::UnexpectedError)?
             .timestamp();
         let exp: usize = exp.try_into().map_err(|_| GenerateTokenError::UnexpectedError)?;
-        let sub = email.as_ref().to_owned();
+        let sub = email.as_ref().expose_secret().clone();
         let claims = Claims { sub, exp };
         
         encode(
@@ -84,7 +85,7 @@ impl AuthService {
 
     /// Generate refresh token from string email
     pub fn generate_refresh_token_from_str(&self, email: &str) -> Result<String, GenerateTokenError> {
-        let email = Email::parse(email).map_err(|_| GenerateTokenError::UnexpectedError)?;
+        let email = Email::parse(Secret::new(email.to_string())).map_err(|_| GenerateTokenError::UnexpectedError)?;
         self.generate_refresh_token(&email)
     }
 
@@ -185,7 +186,7 @@ mod tests {
     fn test_auth_service_jwt_generation() {
         let config = Arc::new(setup_test_config());
         let auth_service = AuthService::new(config);
-        let email = Email::parse("test@example.com").unwrap();
+        let email = Email::parse_from_str("test@example.com").unwrap();
         
         let token = auth_service.generate_jwt_token(&email).expect("Should generate token");
         assert!(!token.is_empty());
@@ -198,7 +199,7 @@ mod tests {
     fn test_auth_service_refresh_token() {
         let config = Arc::new(setup_test_config());
         let auth_service = AuthService::new(config);
-        let email = Email::parse("test@example.com").unwrap();
+        let email = Email::parse_from_str("test@example.com").unwrap();
         
         let token = auth_service.generate_refresh_token(&email).expect("Should generate refresh token");
         assert!(!token.is_empty());

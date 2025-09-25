@@ -1,6 +1,7 @@
 // In-memory HashMap-based user store implementation for the auth-service.
 /// In-memory user store using a HashMap.
 use std::collections::HashMap;
+use secrecy::ExposeSecret;
 use crate::domain::Email;
 
 use crate::domain::{User, UserStore, UserStoreError};
@@ -61,7 +62,7 @@ impl UserStore for HashmapUserStore {
             Some(user) => {
                 // For hashmap store, use simple string comparison 
                 // since Password now stores plaintext
-                if user.password.as_ref() == password {
+                if user.password.as_ref().expose_secret() == password {
                     Ok(())
                 } else {
                     Err(UserStoreError::InvalidCredentials)
@@ -88,8 +89,8 @@ mod tests {
     #[tokio::test]
     async fn test_delete_user() {
         let mut store = HashmapUserStore::default();
-        let email = crate::domain::Email::parse("test@example.com").unwrap();
-        let password = crate::domain::Password::parse("password").unwrap();
+        let email = crate::domain::Email::parse_from_str("test@example.com").unwrap();
+        let password = crate::domain::Password::parse_from_str("password").unwrap();
         let user = User::new(email.clone(), password, false);
         store.add_user(user).await.unwrap();
         assert_eq!(store.delete_user(&email).await, Ok(()));
@@ -99,8 +100,8 @@ mod tests {
     #[tokio::test]
     async fn test_add_user() {
         let mut store = HashmapUserStore::default();
-        let email = crate::domain::Email::parse("test@example.com").unwrap();
-        let password = crate::domain::Password::parse("password").unwrap();
+        let email = crate::domain::Email::parse_from_str("test@example.com").unwrap();
+        let password = crate::domain::Password::parse_from_str("password").unwrap();
         let user = User::new(email.clone(), password, false);
         assert_eq!(store.add_user(user).await, Ok(()));
     }
@@ -108,8 +109,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_user() {
         let mut store = HashmapUserStore::default();
-        let email = crate::domain::Email::parse("test@example.com").unwrap();
-        let password = crate::domain::Password::parse("password").unwrap();
+        let email = crate::domain::Email::parse_from_str("test@example.com").unwrap();
+        let password = crate::domain::Password::parse_from_str("password").unwrap();
         let user = User::new(email.clone(), password, false);
         store.add_user(user.clone()).await.unwrap();
         assert_eq!(store.get_user(&email).await, Ok(user));
@@ -118,9 +119,9 @@ mod tests {
     #[tokio::test]
     async fn test_validate_user() {
         let mut store = HashmapUserStore::default();
-        let email = crate::domain::Email::parse("test@example.com").unwrap();
+        let email = crate::domain::Email::parse_from_str("test@example.com").unwrap();
         let password_plain = "password";
-        let password = crate::domain::Password::parse(password_plain).unwrap();
+        let password = crate::domain::Password::parse_from_str(password_plain).unwrap();
         let user = User::new(email.clone(), password, false);
         store.add_user(user).await.unwrap();
         // Validate with correct password

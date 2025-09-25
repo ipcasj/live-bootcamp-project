@@ -12,6 +12,7 @@ pub async fn get_audit_log() -> AxumJson<Vec<AuditLogEntry>> {
 use axum::{extract::{State, Json}, http::{StatusCode, header}, response::IntoResponse};
 use axum_extra::extract::CookieJar;
 use serde::Deserialize;
+use secrecy::{Secret, ExposeSecret};
 use std::sync::Arc;
 use crate::{
 	app_state::AppState,
@@ -50,7 +51,7 @@ pub async fn verify_2fa(
 ) -> Result<impl IntoResponse, AuthAPIError> {
 	let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
 	// Validate email
-	let email = match Email::parse(&request.email) {
+	let email = match Email::parse(Secret::new(request.email.clone())) {
 		Ok(e) => e,
 		Err(_) => {
 			AUDIT_LOG.lock().unwrap().push(AuditLogEntry {
@@ -94,7 +95,7 @@ pub async fn verify_2fa(
 	let failed_attempts = code_store.get_failed_attempts(&email).await;
 	if failed_attempts >= 5 {
 		AUDIT_LOG.lock().unwrap().push(AuditLogEntry {
-			email: email.as_ref().to_string(),
+			email: email.as_ref().expose_secret().clone(),
 			event: "2fa_failed".into(),
 			timestamp: now,
 			reason: Some("too_many_failed_attempts".into()),
@@ -108,7 +109,7 @@ pub async fn verify_2fa(
 		Err(_) => {
 			code_store.record_failed_attempt(&email).await;
 			AUDIT_LOG.lock().unwrap().push(AuditLogEntry {
-				email: email.as_ref().to_string(),
+				email: email.as_ref().expose_secret().clone(),
 				event: "2fa_failed".into(),
 				timestamp: now,
 				reason: Some("no_code_found".into()),
@@ -122,7 +123,7 @@ pub async fn verify_2fa(
 		code_store.remove_code(&email).await.ok();
 		code_store.record_failed_attempt(&email).await;
 		AUDIT_LOG.lock().unwrap().push(AuditLogEntry {
-			email: email.as_ref().to_string(),
+			email: email.as_ref().expose_secret().clone(),
 			event: "2fa_failed".into(),
 			timestamp: now,
 			reason: Some("code_expired".into()),
@@ -134,7 +135,7 @@ pub async fn verify_2fa(
 	if stored_login_attempt_id != login_attempt_id || stored_code != two_fa_code {
 		code_store.record_failed_attempt(&email).await;
 		AUDIT_LOG.lock().unwrap().push(AuditLogEntry {
-			email: email.as_ref().to_string(),
+			email: email.as_ref().expose_secret().clone(),
 			event: "2fa_failed".into(),
 			timestamp: now,
 			reason: Some("incorrect_code_or_attempt_id".into()),
@@ -146,7 +147,7 @@ pub async fn verify_2fa(
 	code_store.remove_code(&email).await.ok();
 	code_store.reset_failed_attempts(&email).await;
 	AUDIT_LOG.lock().unwrap().push(AuditLogEntry {
-		email: email.as_ref().to_string(),
+		email: email.as_ref().expose_secret().clone(),
 		event: "2fa_success".into(),
 		timestamp: now,
 		reason: None,

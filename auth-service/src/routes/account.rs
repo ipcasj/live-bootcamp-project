@@ -27,7 +27,7 @@ pub async fn get_account_settings(
     State(state): State<Arc<AppState>>,
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    let email = Email::parse(&user.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
+    let email = Email::parse_from_str(&user.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
     let user_store = state.user_store.read().await;
     let (requires_2fa, two_fa_method) = user_store.get_user_settings(&email).await.map_err(|_| AuthAPIError::InvalidCredentials)?;
     Ok(axum::Json(AccountSettingsResponse {
@@ -62,7 +62,7 @@ pub async fn update_2fa_setting(
     user: AuthenticatedUser,
     Json(payload): Json<Update2FARequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    let email = Email::parse(&user.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
+    let email = Email::parse_from_str(&user.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
     let mut user_store = state.user_store.write().await;
     let mut user = user_store.get_user(&email).await.map_err(|_| AuthAPIError::InvalidCredentials)?;
     user.requires_2fa = payload.requires_2fa;

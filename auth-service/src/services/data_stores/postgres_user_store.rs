@@ -4,6 +4,7 @@ use argon2::{
     password_hash::SaltString, Algorithm, Argon2, Params, PasswordHash, PasswordHasher,
     PasswordVerifier, Version,
 };
+use secrecy::{Secret, ExposeSecret};
 
 use sqlx::PgPool;
 use color_eyre::{Result, eyre::Context};
@@ -26,11 +27,11 @@ impl PostgresUserStore {
 
 #[async_trait::async_trait]
 impl UserStore for PostgresUserStore {
-    #[tracing::instrument(name = "Adding user to PostgreSQL", skip_all, fields(email = %user.email.as_ref()))]
+    #[tracing::instrument(name = "Adding user to PostgreSQL", skip_all)]
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
         tracing::info!("Attempting to add new user to database");
         
-        let password_hash = compute_password_hash(user.password.as_ref().to_owned())
+        let password_hash = compute_password_hash(user.password.as_ref().expose_secret().clone())
             .await
             .map_err(|e| {
                 tracing::error!(error = ?e, "Failed to compute password hash");
@@ -39,7 +40,7 @@ impl UserStore for PostgresUserStore {
 
         let result = sqlx::query!(
             "INSERT INTO users (email, password_hash, requires_2fa) VALUES ($1, $2, $3)",
-            user.email.as_ref(),
+            user.email.as_ref().expose_secret(),
             password_hash,
             user.requires_2fa
         )
@@ -60,13 +61,13 @@ impl UserStore for PostgresUserStore {
         Ok(())
     }
 
-    #[tracing::instrument(name = "Retrieving user from PostgreSQL", skip_all, fields(email = %email.as_ref()))]
+    #[tracing::instrument(name = "Retrieving user from PostgreSQL", skip_all)]
     async fn get_user(&self, email: &Email) -> Result<User, UserStoreError> {
         tracing::debug!("Querying database for user");
         
         let row = sqlx::query!(
             "SELECT email, password_hash, requires_2fa FROM users WHERE email = $1",
-            email.as_ref()
+            email.as_ref().expose_secret()
         )
         .fetch_one(&self.pool)
         .await
@@ -81,7 +82,7 @@ impl UserStore for PostgresUserStore {
             }
         })?;
 
-        let email = Email::parse(&row.email).map_err(|e| {
+        let email = Email::parse(Secret::new(row.email)).map_err(|e| {
             tracing::error!(error = ?e, "Failed to parse email from database");
             UserStoreError::UnexpectedError(e.into())
         })?;
@@ -96,7 +97,7 @@ impl UserStore for PostgresUserStore {
         })
     }
 
-    #[tracing::instrument(name = "Validating user credentials in PostgreSQL", skip_all, fields(email = %email.as_ref()))]
+    #[tracing::instrument(name = "Validating user credentials in PostgreSQL", skip_all)]
     async fn validate_user(
         &self,
         email: &Email,
@@ -106,7 +107,7 @@ impl UserStore for PostgresUserStore {
         
         let result = sqlx::query!(
             "SELECT password_hash FROM users WHERE email = $1",
-            email.as_ref()
+            email.as_ref().expose_secret()
         )
         .fetch_optional(&self.pool)
         .await
@@ -133,7 +134,7 @@ impl UserStore for PostgresUserStore {
     }
 
     async fn delete_user(&mut self, email: &Email) -> Result<(), UserStoreError> {
-        let result = sqlx::query!("DELETE FROM users WHERE email = $1", email.as_ref())
+        let result = sqlx::query!("DELETE FROM users WHERE email = $1", email.as_ref().expose_secret())
             .execute(&self.pool)
             .await
             .map_err(|e| UserStoreError::UnexpectedError(e.into()))?;
@@ -146,7 +147,7 @@ impl UserStore for PostgresUserStore {
     }
 
     async fn update_user(&mut self, user: User) -> Result<(), UserStoreError> {
-        let password_hash = compute_password_hash(user.password.as_ref().to_owned())
+        let password_hash = compute_password_hash(user.password.as_ref().expose_secret().clone())
             .await
             .map_err(|e| UserStoreError::UnexpectedError(e))?;
 
@@ -154,7 +155,7 @@ impl UserStore for PostgresUserStore {
             "UPDATE users SET password_hash = $1, requires_2fa = $2 WHERE email = $3",
             password_hash,
             user.requires_2fa,
-            user.email.as_ref()
+            user.email.as_ref().expose_secret()
         )
         .execute(&self.pool)
         .await
@@ -170,7 +171,7 @@ impl UserStore for PostgresUserStore {
     async fn get_user_settings(&self, email: &Email) -> Result<(bool, TwoFAMethod), UserStoreError> {
         let row = sqlx::query!(
             "SELECT requires_2fa FROM users WHERE email = $1",
-            email.as_ref()
+            email.as_ref().expose_secret()
         )
         .fetch_one(&self.pool)
         .await
@@ -183,14 +184,14 @@ impl UserStore for PostgresUserStore {
     }
 
     async fn update_password(&mut self, email: &Email, new_password: Password) -> Result<(), UserStoreError> {
-        let password_hash = compute_password_hash(new_password.as_ref().to_owned())
+        let password_hash = compute_password_hash(new_password.as_ref().expose_secret().clone())
             .await
             .map_err(|e| UserStoreError::UnexpectedError(e))?;
 
         let result = sqlx::query!(
             "UPDATE users SET password_hash = $1 WHERE email = $2",
             password_hash,
-            email.as_ref()
+            email.as_ref().expose_secret()
         )
         .execute(&self.pool)
         .await

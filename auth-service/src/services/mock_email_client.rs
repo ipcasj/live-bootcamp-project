@@ -11,8 +11,8 @@ impl EmailClient for MockEmailClient {
         Ok(())
     }
 
-    async fn send_email(&self, email: &crate::domain::Email, subject: &str, body: &str) -> color_eyre::Result<()> {
-        tracing::debug!("[MOCK EMAIL] To: {}, Subject: {}, Body: {}", email.as_ref(), subject, body);
+    async fn send_email(&self, _email: &crate::domain::Email, subject: &str, body: &str) -> color_eyre::Result<()> {
+        tracing::debug!("[MOCK EMAIL] To: [REDACTED], Subject: {}, Body: {}", subject, body);
         Ok(())
     }
 }

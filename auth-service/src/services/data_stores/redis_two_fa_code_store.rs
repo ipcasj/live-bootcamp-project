@@ -5,6 +5,7 @@ use bb8_redis::{bb8::Pool, redis, RedisConnectionManager};
 use serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 use color_eyre::eyre::Context;
+use secrecy::ExposeSecret;
 
 use crate::{
     domain::{
@@ -46,8 +47,8 @@ impl TwoFACodeStore for RedisTwoFACodeStore {
             .as_secs();
 
         let data = TwoFATuple(
-            login_attempt_id.as_ref().to_owned(),
-            code.as_ref().to_owned(),
+            login_attempt_id.as_ref().expose_secret().clone(),
+            code.as_ref().expose_secret().clone(),
             now,
         );
         let serialized_data = serde_json::to_string(&data)
@@ -199,11 +200,11 @@ const TWO_FA_CODE_PREFIX: &str = "two_fa_code:";
 const FAILED_ATTEMPTS_PREFIX: &str = "two_fa_failed:";
 
 fn get_key(email: &Email) -> String {
-    format!("{}{}", TWO_FA_CODE_PREFIX, email.as_ref())
+    format!("{}{}", TWO_FA_CODE_PREFIX, email.as_ref().expose_secret())
 }
 
 fn get_failed_attempts_key(email: &Email) -> String {
-    format!("{}{}", FAILED_ATTEMPTS_PREFIX, email.as_ref())
+    format!("{}{}", FAILED_ATTEMPTS_PREFIX, email.as_ref().expose_secret())
 }
 
 #[cfg(test)]
@@ -213,14 +214,14 @@ mod tests {
 
     #[test]
     fn test_get_key() {
-        let email = Email::parse("test@example.com").unwrap();
+        let email = Email::parse_from_str("test@example.com").unwrap();
         let key = get_key(&email);
         assert_eq!(key, "two_fa_code:test@example.com");
     }
 
     #[test]
     fn test_get_failed_attempts_key() {
-        let email = Email::parse("test@example.com").unwrap();
+        let email = Email::parse_from_str("test@example.com").unwrap();
         let key = get_failed_attempts_key(&email);
         assert_eq!(key, "two_fa_failed:test@example.com");
     }

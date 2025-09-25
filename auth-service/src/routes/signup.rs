@@ -28,7 +28,7 @@ use tracing::{info, error}; // Both info and error are used
 /// 
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
-use validator::Validate;
+use secrecy::Secret;
 
 use crate::{app_state::AppState, domain::{User, AuthAPIError}};
 use color_eyre::eyre;
@@ -36,13 +36,38 @@ use std::sync::Arc;
 
 
 
-#[derive(Deserialize, Validate, ToSchema)]
+#[derive(Debug, Deserialize)]
 pub struct SignupRequestRest {
-    #[validate(email, length(min = 1))]
-    pub email: String,
-    #[validate(length(min = 8))]
-    pub password: String,
+    #[serde(with = "secret_string")]
+    pub email: Secret<String>,
+    #[serde(with = "secret_string")]
+    pub password: Secret<String>,
     #[serde(rename = "requires2FA")]
+    pub requires_2fa: bool,
+}
+
+// Custom serde module for Secret<String>
+mod secret_string {
+    use serde::{Deserialize, Deserializer};
+    use secrecy::Secret;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Secret<String>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(Secret::new(s))
+    }
+}
+
+// Separate struct for API documentation
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct SignupRequestSchema {
+    /// User's email address
+    pub email: String,
+    /// User's password
+    pub password: String,
+    /// Whether the user requires 2FA
     pub requires_2fa: bool,
 }
 
@@ -54,7 +79,7 @@ pub struct SignupResponseRest {
 #[utoipa::path(
     post,
     path = "/signup",
-    request_body = SignupRequestRest,
+    request_body = SignupRequestSchema,
     responses(
         (status = 201, description = "User created", body = SignupResponseRest),
         (status = 400, description = "Invalid credentials", body = ErrorResponse),
@@ -71,25 +96,20 @@ pub async fn signup(
     State(state): State<Arc<AppState>>,
     Json(request): Json<SignupRequestRest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    // Validate input using validator crate
-    if let Err(e) = request.validate() {
-        error!(?e, "Malformed signup input");
-        // Return 400 for missing/invalid fields
-        return Err(AuthAPIError::MalformedCredentials);
-    }
-
     // Parse and validate email and password using newtypes
-    let email = match crate::domain::Email::parse(&request.email) {
+    let email = match crate::domain::Email::parse(request.email) {
         Ok(e) => e,
         Err(_) => {
-            error!(email = %request.email, "Invalid email format");
+            // Skip logging the email content for security
+            error!("Invalid email format in signup request");
             return Err(AuthAPIError::MalformedCredentials);
         }
     };
-    let password = match crate::domain::Password::parse(&request.password) {
+    let password = match crate::domain::Password::parse(request.password) {
         Ok(p) => p,
         Err(_) => {
-            error!("Invalid password format");
+            // Skip logging the password for security
+            error!("Invalid password format in signup request");
             return Err(AuthAPIError::MalformedCredentials);
         }
     };
@@ -97,24 +117,24 @@ pub async fn signup(
     let user = User::new(email, password, request.requires_2fa);
     let mut user_store = state.user_store.write().await;
 
-    // Simulate a user store failure for test trigger
-    if user.email.as_ref() == "trigger500@example.com" {
-        error!(email = %user.email.as_ref(), "Simulated user store failure");
+    // Simulate a user store failure for test trigger - use ExposeSecret for comparison
+    use secrecy::ExposeSecret;
+    if user.email.as_ref().expose_secret() == "trigger500@example.com" {
+        error!("Simulated user store failure");
         return Err(AuthAPIError::UnexpectedError(eyre::eyre!("Simulated user store failure")));
     }
     // Early return AuthAPIError::UserAlreadyExists if email exists in user_store.
     if user_store.get_user(&user.email).await.is_ok() {
-        error!(email = %user.email.as_ref(), "User already exists");
+        error!("User already exists");
         return Err(AuthAPIError::UserAlreadyExists);
     }
     // Instead of using unwrap, early return AuthAPIError::UnexpectedError if add_user() fails.
-    let user_email = user.email.as_ref().to_owned();
     if let Err(e) = user_store.add_user(user.clone()).await {
         error!(?e, "Unexpected error adding user");
         return Err(AuthAPIError::UnexpectedError(eyre::eyre!("Unexpected error adding user: {:?}", e)));
     }
 
-    info!(email = %user_email, "User created successfully");
+    info!("User created successfully");
     let response = Json(SignupResponseRest {
         message: "User created successfully!".to_string(),
     });

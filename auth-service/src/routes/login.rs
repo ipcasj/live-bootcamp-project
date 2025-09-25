@@ -11,7 +11,15 @@ use serde::Serialize;
 use serde::Deserialize;
 use crate::ErrorResponse;
 use color_eyre::eyre;
+use secrecy::{Secret, ExposeSecret};
 // use anyhow::anyhow; // unused
+
+#[derive(Deserialize)]
+#[allow(dead_code)] // Not currently used - login route uses manual JSON parsing
+pub struct LoginRequest {
+    email: Secret<String>,
+    password: Secret<String>,
+}
 
 
 
@@ -66,7 +74,7 @@ pub async fn login(
 	}
 
 	// 400 for invalid format (bad email/password)
-	let email = match Email::parse(email) {
+	let email = match Email::parse(Secret::new(email.to_string())) {
 		Ok(e) => e,
 		Err(_) => return AuthAPIError::InvalidCredentials.into_response(), // 400
 	};
@@ -113,7 +121,7 @@ async fn handle_2fa(
 
 	if let Err(e) = state
 		.email_client
-		.send_email(email, "2FA Code", two_fa_code.as_ref())
+		.send_email(email, "2FA Code", two_fa_code.as_ref().expose_secret())
 		.await
 	{
 		return Err(AuthAPIError::UnexpectedError(e));
@@ -121,7 +129,7 @@ async fn handle_2fa(
 
 	let response = TwoFactorAuthResponseRest {
 		message: "2FA required".to_owned(),
-		login_attempt_id: login_attempt_id.as_ref().to_owned(),
+		login_attempt_id: login_attempt_id.as_ref().expose_secret().clone(),
 	};
 	
 	// axum 0.6 does not implement IntoResponse for (StatusCode, Json<T>), so do it manually

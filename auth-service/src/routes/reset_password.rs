@@ -1,5 +1,6 @@
 use axum::{extract::{State, Json}, http::StatusCode, response::IntoResponse};
 use serde::Deserialize;
+use secrecy::ExposeSecret;
 use std::sync::Arc;
 use crate::{
     app_state::AppState,
@@ -35,7 +36,7 @@ pub async fn forgot_password(
     Json(request): Json<ForgotPasswordRequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
     // Always respond with generic message
-    let email = match Email::parse(&request.email) {
+    let email = match Email::parse_from_str(&request.email) {
         Ok(e) => e,
         Err(_) => return Ok((StatusCode::OK, Json(serde_json::json!({"message": "If this email exists, you'll receive a reset code."})))),
     };
@@ -47,10 +48,10 @@ pub async fn forgot_password(
         let _ = store.add_code(email.clone(), login_attempt_id.clone(), code.clone()).await;
     }
     // Send code and login_attempt_id via email (reuse email_client)
-    let _ = state.email_client.send_2fa_code(email.as_ref(), code.as_ref()).await;
+    let _ = state.email_client.send_2fa_code(email.as_ref().expose_secret(), code.as_ref().expose_secret()).await;
     Ok((StatusCode::OK, Json(serde_json::json!({
         "message": "If this email exists, you'll receive a reset code.",
-        "loginAttemptId": login_attempt_id.as_ref()
+        "loginAttemptId": login_attempt_id.as_ref().expose_secret()
     }))))
 }
 
@@ -58,14 +59,14 @@ pub async fn reset_password(
     State(state): State<Arc<AppState>>,
     Json(request): Json<ResetPasswordRequest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
-    let email = Email::parse(&request.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
+    let email = Email::parse_from_str(&request.email).map_err(|_| AuthAPIError::InvalidCredentials)?;
     let mut store = state.two_fa_code_store.write().await;
     let (login_attempt_id, code) = store.get_code(&email).await.map_err(|_| AuthAPIError::InvalidToken)?;
-    if login_attempt_id.as_ref() != request.login_attempt_id || code.as_ref() != request.code {
+    if login_attempt_id.as_ref().expose_secret() != &request.login_attempt_id || code.as_ref().expose_secret() != &request.code {
         return Err(AuthAPIError::InvalidToken);
     }
     // Validate new password
-    let new_password = Password::parse(&request.new_password).map_err(|_| AuthAPIError::MalformedCredentials)?;
+    let new_password = Password::parse_from_str(&request.new_password).map_err(|_| AuthAPIError::MalformedCredentials)?;
     // Update password in user store
     {
         let mut user_store = state.user_store.write().await;

@@ -4,6 +4,7 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use once_cell::sync::Lazy;
 use color_eyre::eyre::{eyre, Context, ContextCompat, Result};
+use secrecy::{Secret, ExposeSecret};
 
 use crate::domain::email::Email;
 use crate::config::AppConfig;
@@ -29,7 +30,7 @@ pub fn generate_refresh_token(email: &Email) -> Result<String> {
         .timestamp();
     let exp: usize = exp.try_into()
         .wrap_err("failed to cast exp time to usize")?;
-    let sub = email.as_ref().to_owned();
+    let sub = email.as_ref().expose_secret().clone();
     let claims = Claims { sub, exp };
     encode(
         &jsonwebtoken::Header::default(),
@@ -40,14 +41,14 @@ pub fn generate_refresh_token(email: &Email) -> Result<String> {
 
 #[tracing::instrument(skip_all)]
 pub fn generate_refresh_token_from_str(email: &str) -> Result<String> {
-    let email = Email::parse(email)?;
+    let email = Email::parse(Secret::new(email.to_string()))?;
     generate_refresh_token(&email)
 }
 
 #[tracing::instrument(skip_all)]
 pub async fn validate_refresh_token(token: &str, banned_token_store: Option<crate::app_state::BannedTokenStoreType>) -> Result<Claims, AuthAPIError> {
     if let Some(store) = banned_token_store {
-        match store.read().await.contains_token(token).await {
+        match store.read().await.contains_token(&Secret::new(token.to_string())).await {
             Ok(is_banned) => {
                 if is_banned {
                     return Err(AuthAPIError::InvalidToken);
@@ -104,7 +105,7 @@ fn generate_auth_token(email: &Email) -> Result<String> {
         exp
     ))?;
 
-    let sub = email.as_ref().to_owned();
+    let sub = email.as_ref().expose_secret().clone();
 
     let claims = Claims { sub, exp };
 
@@ -113,7 +114,7 @@ fn generate_auth_token(email: &Email) -> Result<String> {
 
 // Helper to generate auth token from a string email (for refresh_token)
 pub fn generate_auth_token_from_str(email: &str) -> Result<String> {
-    let email = Email::parse(email)?;
+    let email = Email::parse(Secret::new(email.to_string()))?;
     generate_auth_token(&email)
 }
 
@@ -127,7 +128,7 @@ pub async fn validate_token(
     token: &str,
     banned_token_store: crate::app_state::BannedTokenStoreType,
 ) -> Result<Claims> {
-    match banned_token_store.read().await.contains_token(token).await {
+    match banned_token_store.read().await.contains_token(&Secret::new(token.to_string())).await {
         Ok(value) => {
             if value {
                 return Err(eyre!("token is banned"));
@@ -195,7 +196,7 @@ mod tests {
             .try_into()
             .map_err(|_| GenerateTokenError::UnexpectedError)?;
 
-        let sub = email.as_ref().to_owned();
+        let sub = email.as_ref().expose_secret().to_owned();
         let claims = Claims { sub, exp };
         
         encode(
@@ -222,7 +223,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_auth_cookie() {
-        let email = Email::parse("test@example.com").unwrap();
+        let email = Email::parse_from_str("test@example.com").unwrap();
         let cookie = generate_test_auth_cookie(&email).unwrap();
         assert_eq!(cookie.name(), TEST_JWT_COOKIE_NAME);
         assert_eq!(cookie.value().split('.').count(), 3);
@@ -244,14 +245,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_auth_token() {
-        let email = Email::parse("test@example.com").unwrap();
+        let email = Email::parse_from_str("test@example.com").unwrap();
         let result = generate_test_auth_token(&email).unwrap();
         assert_eq!(result.split('.').count(), 3);
     }
 
     #[tokio::test]
     async fn test_validate_token_with_valid_token() {
-        let email = Email::parse("test@example.com").unwrap();
+        let email = Email::parse_from_str("test@example.com").unwrap();
         
         // Capture time before generating token
         let before_generation = Utc::now().timestamp();

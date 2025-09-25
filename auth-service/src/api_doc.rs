@@ -1,6 +1,6 @@
 /// OpenAPI documentation for the auth-service API.
 use utoipa::OpenApi;
-use crate::routes::signup::{SignupRequestRest, SignupResponseRest};
+use crate::routes::signup::{SignupRequestSchema, SignupResponseRest};
 // use crate::routes::login::{TwoFactorAuthResponseRest, LoginResponseRest};
 
 #[derive(OpenApi)]
@@ -9,7 +9,7 @@ use crate::routes::signup::{SignupRequestRest, SignupResponseRest};
         crate::routes::signup::signup,
         crate::routes::signup::health
     ),
-    components(schemas(SignupRequestRest, SignupResponseRest)),
+    components(schemas(SignupRequestSchema, SignupResponseRest)),
     tags(
         (name = "auth", description = "Authentication endpoints"),
         (name = "health", description = "Health check endpoints")

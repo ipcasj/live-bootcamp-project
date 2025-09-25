@@ -42,31 +42,45 @@ impl PartialEq for TwoFACodeStoreError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct LoginAttemptId(String);
+#[derive(Debug, Clone)]
+pub struct LoginAttemptId(secrecy::Secret<String>);
+
+impl PartialEq for LoginAttemptId {
+    fn eq(&self, other: &Self) -> bool {
+        use secrecy::ExposeSecret;
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
 
 impl LoginAttemptId {
     pub fn parse(id: String) -> color_eyre::Result<Self> {
         let parsed_id = uuid::Uuid::parse_str(&id)
             .wrap_err("Invalid login attempt id")?;
-        Ok(Self(parsed_id.to_string()))
+        Ok(Self(secrecy::Secret::new(parsed_id.to_string())))
     }
 }
 
 impl Default for LoginAttemptId {
     fn default() -> Self {
-        LoginAttemptId(uuid::Uuid::new_v4().to_string())
+        LoginAttemptId(secrecy::Secret::new(uuid::Uuid::new_v4().to_string()))
     }
 }
 
-impl AsRef<str> for LoginAttemptId {
-    fn as_ref(&self) -> &str {
+impl AsRef<secrecy::Secret<String>> for LoginAttemptId {
+    fn as_ref(&self) -> &secrecy::Secret<String> {
         &self.0
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TwoFACode(String);
+#[derive(Clone, Debug)]
+pub struct TwoFACode(secrecy::Secret<String>);
+
+impl PartialEq for TwoFACode {
+    fn eq(&self, other: &Self) -> bool {
+        use secrecy::ExposeSecret;
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
 
 impl TwoFACode {
     pub fn parse(code: String) -> color_eyre::Result<Self> {
@@ -80,29 +94,30 @@ impl TwoFACode {
             return Err(color_eyre::eyre::eyre!("2FA code must contain only digits"));
         }
 
-        Ok(Self(code))
+        Ok(Self(secrecy::Secret::new(code)))
     }
 }
 
 impl Default for TwoFACode {
     fn default() -> Self {
         let code: u32 = rand::random::<u32>() % 1_000_000;
-        TwoFACode(format!("{:06}", code))
+        TwoFACode(secrecy::Secret::new(format!("{:06}", code)))
     }
 }
 
-impl AsRef<str> for TwoFACode {
-    fn as_ref(&self) -> &str {
+impl AsRef<secrecy::Secret<String>> for TwoFACode {
+    fn as_ref(&self) -> &secrecy::Secret<String> {
         &self.0
     }
 }
 use async_trait::async_trait;
 use color_eyre::eyre::Context;
+use secrecy::Secret;
 
 #[async_trait]
 pub trait BannedTokenStore: Send + Sync {
-    async fn add_token(&mut self, token: String) -> Result<(), BannedTokenStoreError>;
-    async fn contains_token(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
+    async fn add_token(&mut self, token: Secret<String>) -> Result<(), BannedTokenStoreError>;
+    async fn contains_token(&self, token: &Secret<String>) -> Result<bool, BannedTokenStoreError>;
 }
 
 #[derive(Debug, thiserror::Error)]
