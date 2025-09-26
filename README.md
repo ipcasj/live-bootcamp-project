@@ -8,6 +8,7 @@ A production-ready authentication service with Redis-backed 2FA, PostgreSQL user
 - **Redis-backed 2FA Code Store**: Persistent, scalable 2FA code management with automatic expiration
 - **PostgreSQL User Storage**: Robust user data persistence with Argon2 password hashing
 - **JWT Authentication**: Secure token-based authentication with banned token tracking
+- **Postmark Email Integration**: Production-ready email delivery for 2FA codes and notifications
 - **Environment Profiles**: Development, test, and production configurations
 - **Type-Safe Configuration**: Validated configuration with graceful error handling
 - **REST & gRPC APIs**: Complete API coverage with OpenAPI documentation
@@ -240,6 +241,12 @@ AppConfig {
     refresh_token_expiration: u64,  // Refresh token lifetime
     jwt_cookie_name: String,    // JWT cookie name
     two_fa_code_expiration: u64,    // 2FA code lifetime
+  },
+  email: {
+    base_url: String,           // Postmark API base URL
+    sender: String,             // From email address
+    timeout: u64,               // Request timeout (seconds)
+    postmark_auth_token: String, // Postmark server token
   }
 }
 ```
@@ -334,6 +341,7 @@ Configure these in **Settings → Secrets and variables → Actions**:
 **Secrets:**
 - `POSTGRES_PASSWORD`: Database password (e.g., `SecurePass2024!`)
 - `JWT_SECRET`: JWT signing key (see `.env` file for example)
+- `POSTMARK_AUTH_TOKEN`: Postmark email service server token (get from Postmark account)
 - `DOCKER_USERNAME`: Your Docker Hub username
 - `DOCKER_PASSWORD`: Your Docker Hub password/token
 - `DROPLET_PASSWORD`: DigitalOcean droplet root password

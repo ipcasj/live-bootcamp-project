@@ -24,6 +24,10 @@ pub struct AppConfig {
     /// JWT authentication configuration
     #[validate(nested)]
     pub auth: AuthConfig,
+
+    /// Email configuration
+    #[validate(nested)]
+    pub email: EmailConfig,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, Validate)]
@@ -110,6 +114,27 @@ pub struct AuthConfig {
     pub banned_token_ttl: u64,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone, Validate)]
+pub struct EmailConfig {
+    /// Postmark API base URL
+    #[serde(default = "default_email_base_url")]
+    #[validate(url)]
+    pub base_url: String,
+
+    /// From email address
+    #[serde(default = "default_email_sender")]
+    #[validate(email)]
+    pub sender: String,
+
+    /// Request timeout in seconds
+    #[serde(default = "default_email_timeout")]
+    pub timeout: u64,
+
+    /// Postmark authentication token
+    #[validate(length(min = 1, message = "Postmark auth token is required"))]
+    pub postmark_auth_token: String,
+}
+
 impl AppConfig {
     /// Load configuration from multiple sources with hierarchical precedence:
     /// 1. Environment variables (highest priority)
@@ -140,6 +165,9 @@ impl AppConfig {
         }
         if let Ok(refresh_secret) = env::var("REFRESH_TOKEN_SECRET") {
             builder = builder.set_override("auth.refresh_token_secret", refresh_secret)?;
+        }
+        if let Ok(postmark_token) = env::var("POSTMARK_AUTH_TOKEN") {
+            builder = builder.set_override("email.postmark_auth_token", postmark_token)?;
         }
 
         let config = builder
@@ -241,6 +269,18 @@ fn default_banned_token_ttl() -> u64 {
     600 // 10 minutes (same as JWT expiration by default)
 }
 
+fn default_email_base_url() -> String {
+    "https://api.postmarkapp.com".to_string()
+}
+
+fn default_email_sender() -> String {
+    "noreply@live-bootcamp.com".to_string()
+}
+
+fn default_email_timeout() -> u64 {
+    30 // 30 seconds
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,6 +302,7 @@ mod tests {
         env::remove_var("REDIS_HOST_NAME");
         env::remove_var("ENVIRONMENT");
         env::remove_var("REFRESH_TOKEN_SECRET");
+        env::remove_var("POSTMARK_AUTH_TOKEN");
         env::remove_var("AUTH__BANNED_TOKEN_TTL");
         env::remove_var("AUTH__JWT_EXPIRATION");
         
@@ -273,6 +314,7 @@ mod tests {
         env::remove_var("REDIS_HOST_NAME");
         env::remove_var("ENVIRONMENT");
         env::remove_var("REFRESH_TOKEN_SECRET");
+        env::remove_var("POSTMARK_AUTH_TOKEN");
         env::remove_var("AUTH__BANNED_TOKEN_TTL");
         env::remove_var("AUTH__JWT_EXPIRATION");
         
@@ -284,6 +326,7 @@ mod tests {
         with_clean_env(|| {
             env::set_var("DATABASE_URL", "postgres://test:test@localhost:5432/test");
             env::set_var("JWT_SECRET", "test_secret_key_that_is_long_enough_for_validation");
+            env::set_var("POSTMARK_AUTH_TOKEN", "test_token_for_validation");
             env::set_var("ENVIRONMENT", "test");
             
             let config = AppConfig::load().expect("Should load with defaults");
@@ -305,6 +348,7 @@ mod tests {
             // Test invalid JWT secret (too short) - should pass validation now
             env::set_var("DATABASE_URL", "postgres://test:test@localhost:5432/test");
             env::set_var("JWT_SECRET", "short_but_long_enough_for_validation");
+            env::set_var("POSTMARK_AUTH_TOKEN", "test_token_for_validation");
             env::set_var("ENVIRONMENT", "test");
             
             // This should now pass because we have a long enough secret
@@ -323,6 +367,7 @@ mod tests {
         with_clean_env(|| {
             env::set_var("DATABASE_URL", "postgres://test:test@localhost:5432/test");
             env::set_var("JWT_SECRET", "test_secret_key_that_is_long_enough_for_validation");
+            env::set_var("POSTMARK_AUTH_TOKEN", "test_token_for_validation");
             env::set_var("ENVIRONMENT", "test");
             
             let mut config = AppConfig::load().expect("Should load");

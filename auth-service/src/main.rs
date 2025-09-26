@@ -35,8 +35,18 @@ async fn main() {
     let user_store: UserStoreType = Arc::new(tokio::sync::RwLock::new(PostgresUserStore::new(pg_pool)));
     let banned_token_store: BannedTokenStoreType = Arc::new(tokio::sync::RwLock::new(RedisBannedTokenStore::new(Arc::new(redis_pool.clone()), config_arc.clone())));
     let two_fa_code_store = auth_service::services::two_fa_code_store_factory::redis_two_fa_code_store(Arc::new(redis_pool), config_arc.clone());
-    use auth_service::services::mock_email_client::MockEmailClient;
-    let email_client = Arc::new(MockEmailClient);
+    
+    // Initialize Postmark email client
+    use auth_service::services::postmark_email_client::PostmarkEmailClient;
+    let email_client = Arc::new(
+        PostmarkEmailClient::new(
+            config_arc.email.base_url.clone(),
+            config_arc.email.sender.clone(),
+            config_arc.email.postmark_auth_token.clone(),
+            config_arc.email.timeout,
+        ).await.expect("Failed to initialize Postmark email client")
+    );
+    
     let app_state = Arc::new(AppState::new(user_store, banned_token_store, two_fa_code_store, email_client, config_arc.clone()));
 
     // Set up graceful shutdown signal (Ctrl+C)

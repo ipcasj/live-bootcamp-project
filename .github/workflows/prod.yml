@@ -80,6 +80,7 @@ jobs:
       env:
         DATABASE_URL: postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/postgres
         JWT_SECRET: test_jwt_secret_key_that_is_32_characters_long_for_github_ci_testing
+        POSTMARK_AUTH_TOKEN: test_token_for_validation
         ENVIRONMENT: test
         SQLX_OFFLINE: true
       run: |
@@ -160,6 +161,7 @@ jobs:
           export JWT_SECRET=${{ secrets.JWT_SECRET }}
           export AUTH_SERVICE_IP=${{ vars.DROPLET_IP }}
           export POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          export POSTMARK_AUTH_TOKEN=${{ secrets.POSTMARK_AUTH_TOKEN }}
           docker compose down || true
           docker compose pull
           docker compose up -d

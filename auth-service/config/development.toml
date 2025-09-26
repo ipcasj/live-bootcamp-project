@@ -26,3 +26,10 @@ refresh_token_expiration = 86400  # 1 day
 jwt_cookie_name = "jwt_dev"
 two_fa_code_expiration = 300  # 5 minutes for faster testing
 banned_token_ttl = 3600       # 1 hour (matches jwt_expiration)
+
+[email]
+# POSTMARK_AUTH_TOKEN should be set via environment variable for security
+base_url = "https://api.postmarkapp.com"
+sender = "dev@live-bootcamp.com"
+timeout = 30  # 30 seconds
+postmark_auth_token = "your_postmark_token_here"  # Override with environment variable

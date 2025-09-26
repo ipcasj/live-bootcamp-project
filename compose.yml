@@ -20,6 +20,8 @@ services:
       DATABASE_URL: "postgres://postgres:${POSTGRES_PASSWORD}@db:5432"
       # Redis connection
       REDIS_HOST_NAME: redis
+      # Postmark email service token
+      POSTMARK_AUTH_TOKEN: ${POSTMARK_AUTH_TOKEN}
     ports:
       - "3000:3000" # expose port 3000 for internal use only (not needed for public access)
     # New! Ensure database and Redis are ready before starting auth service

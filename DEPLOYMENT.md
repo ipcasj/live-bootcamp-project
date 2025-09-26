@@ -9,7 +9,8 @@ Before deploying, configure these secrets in your GitHub repository:
 2. **DOCKER_PASSWORD** - Your Docker Hub password/token
 3. **JWT_SECRET** - A cryptographically secure random string (generate with: `openssl rand -base64 64`)
 4. **POSTGRES_PASSWORD** - A strong PostgreSQL password
-5. **DROPLET_PASSWORD** - Your DigitalOcean droplet root password
+5. **POSTMARK_AUTH_TOKEN** - Your Postmark email service server token (get from Postmark account)
+6. **DROPLET_PASSWORD** - Your DigitalOcean droplet root password
 
 ### GitHub Variables Configuration
 Configure these variables in your GitHub repository:
@@ -21,6 +22,7 @@ Configure these variables in your GitHub repository:
 The `.env` file is included in the repository for simplicity with these default values:
 - `POSTGRES_PASSWORD=SecurePass2024!`
 - `JWT_SECRET=g4iNvB23GraeR2d1SsIDL9lxqynITs/8c9JOSL0BvY5aR6a1Lv69gl1Gq0N6vJLY5ntgpRg3WOvzqXVojUGdBA==`
+- `POSTMARK_AUTH_TOKEN=811133ca-606b-42ed-b693-3c2f03c6e68c`
 - `AUTH_SERVICE_IP=auth-service`
 
 **Note:** These values work for development and demo purposes. For production, you may want to use the same values or update them via GitHub Secrets.
@@ -42,10 +44,15 @@ The application uses a named Docker volume `db` for PostgreSQL data persistence.
 
 ### Deployment Process
 
-1. Push to main branch
-2. GitHub Actions will:
-   - Build and test both services
-   - Create Docker images
+1. **Set up Postmark Email Service:**
+   - Create account at https://postmarkapp.com/
+   - Create a Server and get the Server Token
+   - Add Server Token to GitHub Secrets as `POSTMARK_AUTH_TOKEN`
+
+2. **Push to main branch**
+3. **GitHub Actions will:**
+   - Build and test both services (including email integration)
+   - Create Docker images with Postmark email client
    - Deploy to DigitalOcean droplet
    - Start services with Docker Compose
 
@@ -53,6 +60,15 @@ The application uses a named Docker volume `db` for PostgreSQL data persistence.
 
 - PostgreSQL: Health check ensures database is ready before starting auth-service
 - Services: All services have restart policies for high availability
+- Email Service: Postmark integration with timeout handling and error recovery
+
+### Email Features
+
+The application now includes production-ready email functionality:
+- **2FA Code Delivery**: Automatic email delivery for authentication codes
+- **User Notifications**: Account verification and security notifications
+- **Error Handling**: Proper timeout and retry logic for email delivery
+- **Security**: Token-based authentication with secure credential storage
 
 ### Security Notes
 

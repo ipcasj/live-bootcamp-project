@@ -18,6 +18,7 @@ async fn delete_database(db_name: &str) {
     std::env::set_var("ENVIRONMENT", "test");
     std::env::set_var("DATABASE_URL", "postgres://postgres:SecurePass2024!@localhost:5432/postgres");
     std::env::set_var("JWT_SECRET", "test_jwt_secret_key_that_is_32_characters_long_for_github_ci_testing");
+    std::env::set_var("POSTMARK_AUTH_TOKEN", "test_token_for_validation");
     std::env::set_var("REDIS_HOST_NAME", "localhost");
     std::env::set_var("SQLX_OFFLINE", "true");
     
@@ -61,6 +62,7 @@ async fn create_database(db_name: &str) -> sqlx::Pool<sqlx::Postgres> {
     std::env::set_var("ENVIRONMENT", "test");
     std::env::set_var("DATABASE_URL", "postgres://postgres:SecurePass2024!@localhost:5432/postgres");
     std::env::set_var("JWT_SECRET", "test_jwt_secret_key_that_is_32_characters_long_for_github_ci_testing");
+    std::env::set_var("POSTMARK_AUTH_TOKEN", "test_token_for_validation");
     std::env::set_var("REDIS_HOST_NAME", "localhost");
     std::env::set_var("SQLX_OFFLINE", "true");
     
@@ -159,6 +161,7 @@ impl TestApp {
         std::env::set_var("ENVIRONMENT", "test");
         std::env::set_var("DATABASE_URL", "postgres://postgres:SecurePass2024!@localhost:5432/postgres");
         std::env::set_var("JWT_SECRET", "test_jwt_secret_key_that_is_32_characters_long_for_github_ci_testing");
+        std::env::set_var("POSTMARK_AUTH_TOKEN", "test_token_for_validation");
         std::env::set_var("REDIS_HOST_NAME", "localhost");
         std::env::set_var("SQLX_OFFLINE", "true");
         
@@ -186,8 +189,33 @@ impl TestApp {
         let user_store: UserStoreType = Arc::new(RwLock::new(PostgresUserStore::new(db_pool)));
         let banned_token_store: BannedTokenStoreType = Arc::new(RwLock::new(RedisBannedTokenStore::new(redis_pool.clone(), test_config.clone())));
         let two_fa_code_store: TwoFACodeStoreType = two_fa_code_store_factory::redis_two_fa_code_store(redis_pool.clone(), test_config.clone());
-        use auth_service::services::mock_email_client::MockEmailClient;
-        let email_client = Arc::new(MockEmailClient);
+        
+        // Set up mock Postmark server for testing
+        use wiremock::{MockServer, Mock, ResponseTemplate};
+        use wiremock::matchers::{method, path, header};
+        
+        let mock_server = MockServer::start().await;
+        
+        // Mock successful email sending
+        Mock::given(method("POST"))
+            .and(path("/email"))
+            .and(header("X-Postmark-Server-Token", "test_token_for_validation"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "MessageID": "b7bc2f4a-e38e-4336-af7d-e6c392c2f817"
+            })))
+            .mount(&mock_server)
+            .await;
+        
+        // Create PostmarkEmailClient with mock server URL
+        use auth_service::services::postmark_email_client::PostmarkEmailClient;
+        let email_client = Arc::new(
+            PostmarkEmailClient::new(
+                mock_server.uri(),
+                "test@live-bootcamp.com".to_string(),
+                "test_token_for_validation".to_string(),
+                5, // 5 second timeout for tests
+            ).await.expect("Failed to create test email client")
+        );
         
         let app_state = Arc::new(AppState::new(
             user_store.clone(), 
