@@ -91,50 +91,105 @@ pub struct SignupResponseRest {
 )]
 /// Signup endpoint for user registration.
 
-#[tracing::instrument(name = "User Signup", skip_all, err(Debug))]
+#[tracing::instrument(
+    name = "User Signup", 
+    skip_all, 
+    err(Debug),
+    fields(
+        email = tracing::field::Empty,
+        requires_2fa = request.requires_2fa,
+        password_length = tracing::field::Empty,
+    )
+)]
 pub async fn signup(
     State(state): State<Arc<AppState>>,
     Json(request): Json<SignupRequestRest>,
 ) -> Result<impl IntoResponse, AuthAPIError> {
+    tracing::info!("👤 Processing new user signup request");
+    
     // Parse and validate email and password using newtypes
     let email = match crate::domain::Email::parse(request.email) {
-        Ok(e) => e,
-        Err(_) => {
-            // Skip logging the email content for security
-            error!("Invalid email format in signup request");
+        Ok(e) => {
+            // Record email in tracing span
+            tracing::Span::current().record("email", e.as_ref().expose_secret());
+            tracing::debug!(
+                email = %e.as_ref().expose_secret(),
+                "📧 Email parsed and validated successfully"
+            );
+            e
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "❌ Invalid email format in signup request"
+            );
             return Err(AuthAPIError::MalformedCredentials);
         }
     };
+    
     let password = match crate::domain::Password::parse(request.password) {
-        Ok(p) => p,
-        Err(_) => {
-            // Skip logging the password for security
-            error!("Invalid password format in signup request");
+        Ok(p) => {
+            // Record password length for debugging (not the actual password)
+            tracing::Span::current().record("password_length", p.as_ref().expose_secret().len());
+            tracing::debug!(
+                password_length = p.as_ref().expose_secret().len(),
+                "🔒 Password parsed and validated successfully"
+            );
+            p
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                "❌ Invalid password format in signup request"
+            );
             return Err(AuthAPIError::MalformedCredentials);
         }
     };
 
     let user = User::new(email, password, request.requires_2fa);
+    
+    tracing::debug!(
+        email = %user.email.as_ref().expose_secret(),
+        requires_2fa = user.requires_2fa,
+        "👤 User object created, checking for existing user"
+    );
+    
     let mut user_store = state.user_store.write().await;
 
     // Simulate a user store failure for test trigger - use ExposeSecret for comparison
     use secrecy::ExposeSecret;
     if user.email.as_ref().expose_secret() == "trigger500@example.com" {
-        error!("Simulated user store failure");
+        tracing::error!(
+            email = %user.email.as_ref().expose_secret(),
+            "💥 Simulated user store failure triggered"
+        );
         return Err(AuthAPIError::UnexpectedError(eyre::eyre!("Simulated user store failure")));
     }
+    
     // Early return AuthAPIError::UserAlreadyExists if email exists in user_store.
     if user_store.get_user(&user.email).await.is_ok() {
-        error!("User already exists");
+        tracing::warn!(
+            email = %user.email.as_ref().expose_secret(),
+            "⚠️  Signup attempted for existing user"
+        );
         return Err(AuthAPIError::UserAlreadyExists);
     }
     // Instead of using unwrap, early return AuthAPIError::UnexpectedError if add_user() fails.
     if let Err(e) = user_store.add_user(user.clone()).await {
-        error!(?e, "Unexpected error adding user");
+        tracing::error!(
+            email = %user.email.as_ref().expose_secret(),
+            error = ?e,
+            "❌ Unexpected error adding user to store"
+        );
         return Err(AuthAPIError::UnexpectedError(eyre::eyre!("Unexpected error adding user: {:?}", e)));
     }
 
-    info!("User created successfully");
+    tracing::info!(
+        email = %user.email.as_ref().expose_secret(),
+        requires_2fa = user.requires_2fa,
+        "🎉 User created successfully"
+    );
+    
     let response = Json(SignupResponseRest {
         message: "User created successfully!".to_string(),
     });

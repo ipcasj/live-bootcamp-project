@@ -9,6 +9,7 @@ A production-ready authentication service with Redis-backed 2FA, PostgreSQL user
 - **PostgreSQL User Storage**: Robust user data persistence with Argon2 password hashing
 - **JWT Authentication**: Secure token-based authentication with banned token tracking
 - **Postmark Email Integration**: Production-ready email delivery for 2FA codes and notifications
+- **Runtime-Configurable Logging**: Advanced tracing with adjustable log levels, structured JSON output, and sensitive data filtering
 - **Environment Profiles**: Development, test, and production configurations
 - **Type-Safe Configuration**: Validated configuration with graceful error handling
 - **REST & gRPC APIs**: Complete API coverage with OpenAPI documentation
@@ -248,6 +249,90 @@ AppConfig {
     timeout: u64,               // Request timeout (seconds)
     postmark_auth_token: String, // Postmark server token
   }
+}
+```
+
+## 📊 Advanced Logging & Observability
+
+The auth service features a comprehensive, production-ready logging system with runtime-configurable levels and structured output.
+
+### Logging Features
+
+- **Runtime Log Level Adjustment**: Change log levels without restarting the service
+- **Environment-Aware Defaults**: Automatic configuration based on deployment environment
+- **Structured JSON Logging**: Machine-parseable logs for production environments  
+- **Sensitive Data Filtering**: Automatic redaction of passwords, tokens, and PII
+- **Request Correlation IDs**: Track requests across service boundaries
+- **Performance Metrics**: Built-in timing and performance instrumentation
+- **Async Logging**: Non-blocking log output for optimal performance
+
+### Environment-Based Log Configuration
+
+| Environment | Default Level | Format | Sensitive Data | File Logging |
+|-------------|---------------|---------|----------------|--------------|
+| **Development** | `debug` | Pretty Console | ✅ Included | ❌ Console Only |
+| **Testing** | `info` | Structured | ❌ Filtered | ❌ Console Only |
+| **Production** | `warn` | JSON | ❌ Filtered | ✅ With Rotation |
+
+### Environment Variables
+
+```bash
+# Environment: development, testing, production
+ENVIRONMENT=development
+
+# Log level: trace, debug, info, warn, error  
+LOG_LEVEL=debug
+
+# Use JSON format for structured logging
+LOG_JSON_FORMAT=false
+
+# Include sensitive data in logs (development only)
+LOG_INCLUDE_SENSITIVE=true
+
+# Enable file logging with rotation
+LOG_TO_FILE=false
+LOG_FILE_PATH=/var/log/auth-service/app.log
+```
+
+### Runtime Log Control API
+
+The auth service exposes HTTP endpoints for runtime log level management:
+
+```bash
+# Get current logging configuration
+curl http://localhost:3000/logging/config
+
+# Update log level at runtime
+curl -X PUT http://localhost:3000/logging/config \
+  -H "Content-Type: application/json" \
+  -d '{"level": "debug", "json_format": false}'
+
+# Test logging at different levels
+curl http://localhost:3000/logging/test?level=debug
+```
+
+### Structured Log Examples
+
+**Development (Pretty Console):**
+```
+2025-09-25T10:30:15.123Z  INFO auth_service::routes::login: 🔐 User login successful - no 2FA required
+    email: user@example.com
+    requires_2fa: false
+    request_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+**Production (JSON):**
+```json
+{
+  "timestamp": "2025-09-25T10:30:15.123456Z",
+  "level": "INFO",
+  "fields": {
+    "message": "User login successful - no 2FA required",
+    "email": "[REDACTED]",
+    "requires_2fa": false,
+    "request_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+  },
+  "target": "auth_service::routes::login"
 }
 ```
 

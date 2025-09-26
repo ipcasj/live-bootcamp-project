@@ -32,6 +32,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y libssl-dev && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/auth-service /usr/local/bin
 COPY --from=builder /app/assets /app/assets
+COPY --from=builder /app/config /app/config
 # Set Redis hostname for Docker environment
 ENV REDIS_HOST_NAME=redis
 ENTRYPOINT ["/usr/local/bin/auth-service"]

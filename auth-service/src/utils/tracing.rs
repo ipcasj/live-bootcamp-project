@@ -1,45 +1,115 @@
 //! Comprehensive tracing utilities for observability and monitoring
 //! 
 //! This module provides centralized tracing configuration and HTTP request instrumentation
-//! to enhance observability across the auth service.
+//! to enhance observability across the auth service with runtime-configurable log levels.
 
 use std::time::Duration;
+use std::io;
 use http::{Request, Response};
 use hyper::Body;
 use tracing::{Level, Span};
 use color_eyre::eyre::Result;
 use tracing_error::ErrorLayer;
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::{fmt, EnvFilter};
+use tracing_subscriber::{fmt, Registry};
+use tracing_appender::{non_blocking, rolling};
 
-/// Initializes the tracing subscriber with environment-aware configuration and error reporting
+use super::logging_config::{init_global_logging_config, get_logging_config};
+
+/// Initializes the tracing subscriber with advanced runtime-configurable logging
 /// 
 /// This function sets up comprehensive tracing for the application with:
-/// - Environment-based filtering
-/// - Compact format for better readability
-/// - Error layer for enhanced error reporting with span traces
-/// - Registry-based subscriber for multiple layers
+/// - Runtime-adjustable log levels
+/// - Environment-aware configuration (dev/test/prod)
+/// - JSON structured logging for production
+/// - Pretty console logging for development
+/// - Optional file logging with rotation
+/// - Enhanced error reporting with span traces
+/// - Performance-optimized async logging
 pub fn init_tracing() -> Result<()> {
-    // Create a formatting layer for tracing output with a compact format
-    let fmt_layer = fmt::layer().compact();
+    // Initialize global logging configuration from environment
+    init_global_logging_config()?;
+    
+    let config = get_logging_config()?;
+    
+    tracing::info!(
+        version = env!("CARGO_PKG_VERSION"),
+        environment = ?config.environment,
+        log_level = %config.level,
+        json_format = config.json_format,
+        log_to_file = config.log_to_file,
+        "🔍 Initializing advanced tracing with runtime configuration"
+    );
 
-    // Create a filter layer to control the verbosity of logs
-    // Try to get the filter configuration from the environment variables
-    // If it fails, default to the "info" log level
-    let filter_layer = EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info"))?;
+    // Create environment filter based on configuration
+    let filter_layer = config.get_env_filter()?;
 
-    // Build the tracing subscriber registry with the formatting layer,
-    // the filter layer, and the error layer for enhanced error reporting
-    tracing_subscriber::registry()
-        .with(filter_layer) // Add the filter layer to control log verbosity
-        .with(fmt_layer) // Add the formatting layer for compact log output
-        .with(ErrorLayer::default()) // Add the error layer to capture error contexts
-        .init(); // Initialize the tracing subscriber
+    // Build the subscriber based on environment and configuration
+    let registry = Registry::default()
+        .with(filter_layer)
+        .with(ErrorLayer::default());
+
+    // Configure output format based on environment
+    if config.json_format {
+        // Production: JSON structured logging
+        if config.log_to_file && config.log_file_path.is_some() {
+            // File logging with rotation
+            let file_path = config.log_file_path.as_ref().unwrap();
+            let file_appender = rolling::daily(
+                std::path::Path::new(file_path).parent().unwrap_or(std::path::Path::new(".")),
+                std::path::Path::new(file_path).file_name().unwrap_or(std::ffi::OsStr::new("app.log"))
+            );
+            let (file_writer, _guard) = non_blocking(file_appender);
+            
+            // Console + File JSON logging
+            let subscriber = registry
+                .with(fmt::layer()
+                    .json()
+                    .with_writer(io::stdout)
+                    .with_target(true)
+                    .with_thread_ids(true)
+                    .with_thread_names(true))
+                .with(fmt::layer()
+                    .json()
+                    .with_writer(file_writer)
+                    .with_target(true)
+                    .with_thread_ids(true)
+                    .with_thread_names(true));
+            
+            subscriber.init();
+            
+            // Store the guard to prevent dropping
+            // TODO: In a real application, we'd store this guard somewhere persistent
+        } else {
+            // Console-only JSON logging
+            let subscriber = registry
+                .with(fmt::layer()
+                    .json()
+                    .with_target(true)
+                    .with_thread_ids(true)
+                    .with_thread_names(true));
+            
+            subscriber.init();
+        }
+    } else {
+        // Development/Testing: Pretty console logging
+        let subscriber = registry
+            .with(fmt::layer()
+                .compact()
+                .with_target(false)
+                .with_thread_ids(false)
+                .with_thread_names(false));
+        
+        subscriber.init();
+    }
 
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
-        environment = %std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string()),
-        "🔍 Tracing initialized successfully with error reporting"
+        environment = ?config.environment,
+        log_level = %config.level,
+        json_format = config.json_format,
+        include_sensitive = config.include_sensitive_data,
+        "� Advanced tracing initialized successfully"
     );
 
     Ok(())

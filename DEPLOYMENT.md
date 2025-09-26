@@ -12,6 +12,11 @@ Before deploying, configure these secrets in your GitHub repository:
 5. **POSTMARK_AUTH_TOKEN** - Your Postmark email service server token (get from Postmark account)
 6. **DROPLET_PASSWORD** - Your DigitalOcean droplet root password
 
+**Note:** The logging configuration (LOG_LEVEL, LOG_JSON_FORMAT, LOG_INCLUDE_SENSITIVE) is hardcoded to production-safe values in the GitHub Actions workflow:
+- LOG_LEVEL=warn (appropriate for production)
+- LOG_JSON_FORMAT=true (structured logs for monitoring)
+- LOG_INCLUDE_SENSITIVE=false (security: no sensitive data in logs)
+
 ### GitHub Variables Configuration
 Configure these variables in your GitHub repository:
 
@@ -24,6 +29,9 @@ The `.env` file is included in the repository for simplicity with these default 
 - `JWT_SECRET=g4iNvB23GraeR2d1SsIDL9lxqynITs/8c9JOSL0BvY5aR6a1Lv69gl1Gq0N6vJLY5ntgpRg3WOvzqXVojUGdBA==`
 - `POSTMARK_AUTH_TOKEN=811133ca-606b-42ed-b693-3c2f03c6e68c`
 - `AUTH_SERVICE_IP=auth-service`
+- `LOG_LEVEL=debug` (development), `warn` (production)
+- `LOG_JSON_FORMAT=false` (development), `true` (production)
+- `LOG_INCLUDE_SENSITIVE=true` (development), `false` (production)
 
 **Note:** These values work for development and demo purposes. For production, you may want to use the same values or update them via GitHub Secrets.
 
@@ -69,6 +77,28 @@ The application now includes production-ready email functionality:
 - **User Notifications**: Account verification and security notifications
 - **Error Handling**: Proper timeout and retry logic for email delivery
 - **Security**: Token-based authentication with secure credential storage
+
+### Logging and Monitoring
+
+The application includes advanced logging capabilities for production monitoring:
+- **Runtime Log Control**: Adjust log levels without service restart via HTTP endpoints
+- **Structured JSON Logging**: Machine-parseable logs for monitoring systems
+- **Sensitive Data Protection**: Automatic redaction of passwords, tokens, and PII in production
+- **Environment-Aware Configuration**: Different log levels for development, testing, and production
+
+#### Production Logging Endpoints
+```bash
+# Get current logging configuration
+curl http://your-droplet-ip:3000/logging/config
+
+# Update log level dynamically (useful for debugging issues)
+curl -X PUT http://your-droplet-ip:3000/logging/config \
+  -H "Content-Type: application/json" \
+  -d '{"level": "debug", "json_format": true}'
+
+# Test logging functionality
+curl http://your-droplet-ip:3000/logging/test
+```
 
 ### Security Notes
 

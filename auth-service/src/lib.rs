@@ -195,6 +195,8 @@ impl Application {
             .route("/account/settings", axum::routing::patch(routes::account::update_2fa_setting))
             .route("/health", axum::routing::get(routes::signup::health))
             .route("/openapi.json", get(|| async move { openapi_json }))
+            // Add runtime logging control endpoints
+            .merge(routes::logging::create_logging_router())
             .fallback_service(
                 get_service(ServeDir::new("assets"))
             )

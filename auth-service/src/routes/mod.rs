@@ -1,9 +1,10 @@
 pub mod account;
 pub mod auth;
-pub mod signup;
+pub mod logging;
 pub mod login;
 pub mod logout;
-pub mod verify_2fa;
-pub mod verify_token;
 pub mod refresh_token;
 pub mod reset_password;
+pub mod signup;
+pub mod verify_2fa;
+pub mod verify_token;

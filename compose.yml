@@ -5,6 +5,9 @@ services:
     restart: "always" # automatically restart container when server crashes
     environment: # set up environment variables
       AUTH_SERVICE_IP: ${AUTH_SERVICE_IP:-localhost} # Use localhost as the default value
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_JSON_FORMAT: ${LOG_JSON_FORMAT:-false}
+      LOG_INCLUDE_SENSITIVE: ${LOG_INCLUDE_SENSITIVE:-false}
     ports:
       - "8000:8000" # expose port 8000 for internal use only (not needed for public access)
     depends_on: # only run app-service after auth-service has started
@@ -22,6 +25,12 @@ services:
       REDIS_HOST_NAME: redis
       # Postmark email service token
       POSTMARK_AUTH_TOKEN: ${POSTMARK_AUTH_TOKEN}
+      # Environment for production-like settings in Docker
+      ENVIRONMENT: production
+      # Logging configuration
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_JSON_FORMAT: ${LOG_JSON_FORMAT:-true}
+      LOG_INCLUDE_SENSITIVE: ${LOG_INCLUDE_SENSITIVE:-false}
     ports:
       - "3000:3000" # expose port 3000 for internal use only (not needed for public access)
     # New! Ensure database and Redis are ready before starting auth service
