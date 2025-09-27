@@ -1,0 +1,29 @@
+# Rust webhook receiver Dockerfile
+FROM rust:1.86-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache musl-dev
+
+WORKDIR /app
+
+# Copy the webhook receiver project
+COPY webhook-receiver/ ./
+
+# Build the application
+RUN cargo build --release
+
+# Runtime image
+FROM alpine:latest
+RUN apk add --no-cache ca-certificates
+
+WORKDIR /app
+
+# Copy the binary from builder stage
+COPY --from=builder /app/target/release/webhook-receiver /usr/local/bin/webhook-receiver
+
+# Create log directory
+RUN mkdir -p /var/log/webhook
+
+EXPOSE 8080
+
+CMD ["webhook-receiver"]

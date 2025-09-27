@@ -24,4 +24,6 @@ tmp/
 temp/
 
 # Ignore Docker volumes
-db-data/
+db-data/target/
+*.log
+.env.local

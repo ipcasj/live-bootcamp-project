@@ -1,0 +1,100 @@
+# Development Docker Compose with observability stack
+# This extends the base compose.yml with Grafana, Loki, and other dev tools
+version: '3.8'
+
+services:
+  # Extend auth-service with external logging configuration
+  auth-service:
+    environment:
+      # External logging configuration - Loki for Grafana
+      EXTERNAL_LOGGING_ENABLED: "true"
+      EXTERNAL_LOGGING_SERVICE_TYPE: "loki"
+      EXTERNAL_LOGGING_ENDPOINT: "http://loki:3100/loki/api/v1/push"
+      EXTERNAL_LOGGING_BATCH_SIZE: "5"
+      EXTERNAL_LOGGING_FLUSH_INTERVAL: "3"
+      # File logging configuration
+      FILE_LOGGING_ENABLED: "true"
+    depends_on:
+      - loki
+      - webhook-test
+
+  # Extend app-service with external logging configuration
+  app-service:
+    environment:
+      # External logging configuration - Loki for Grafana
+      EXTERNAL_LOGGING_ENABLED: "true"
+      EXTERNAL_LOGGING_SERVICE_TYPE: "loki"
+      EXTERNAL_LOGGING_ENDPOINT: "http://loki:3100/loki/api/v1/push"
+      EXTERNAL_LOGGING_BATCH_SIZE: "5"
+      EXTERNAL_LOGGING_FLUSH_INTERVAL: "3"
+      # File logging configuration
+      FILE_LOGGING_ENABLED: "true"
+    depends_on:
+      - loki
+      - webhook-test
+
+  # Grafana for log visualization and monitoring
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3001:3000"  # Use 3001 to avoid conflict with auth-service
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  # Loki for log aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    restart: unless-stopped
+
+  # Promtail for log collection (optional, our services will send directly)
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - /var/log:/var/log:ro
+      - ./promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    restart: unless-stopped
+    depends_on:
+      - loki
+
+  # Webhook service for testing external logging to HTTP endpoints (Rust-based)
+  webhook-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.webhook-rust
+    container_name: webhook-test
+    ports:
+      - "8080:8080"
+    volumes:
+      - webhook_logs:/var/log/webhook
+    restart: unless-stopped
+
+# Named volumes for persistence
+volumes:
+  grafana-data:
+    driver: local
+  loki-data:
+    driver: local
+  auth_logs:
+    driver: local
+  app_logs:
+    driver: local
+  webhook_logs:
+    driver: local

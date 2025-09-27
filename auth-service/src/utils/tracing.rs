@@ -15,6 +15,8 @@ use tracing_subscriber::{fmt, Registry};
 use tracing_appender::{non_blocking, rolling};
 
 use super::logging_config::{init_global_logging_config, get_logging_config};
+use super::external_logging::{ExternalLoggingConfig, ExternalLoggingLayer};
+use super::file_logging::{FileLoggingConfig, FileLoggingManager};
 
 /// Initializes the tracing subscriber with advanced runtime-configurable logging
 /// 
@@ -38,7 +40,7 @@ pub fn init_tracing() -> Result<()> {
         log_level = %config.level,
         json_format = config.json_format,
         log_to_file = config.log_to_file,
-        "🔍 Initializing advanced tracing with runtime configuration"
+        "🔍 Initializing advanced tracing with runtime configuration and external service support"
     );
 
     // Create environment filter based on configuration
@@ -49,6 +51,38 @@ pub fn init_tracing() -> Result<()> {
         .with(filter_layer)
         .with(ErrorLayer::default());
 
+    // Initialize external logging configuration safely
+    let external_config = ExternalLoggingConfig::from_env();
+    
+    // Initialize enhanced file logging if enabled
+    let file_config = FileLoggingConfig::default();
+    if file_config.enabled {
+        match FileLoggingManager::new(file_config.clone()) {
+            Ok(_file_manager) => {
+                tracing::info!(
+                    log_dir = ?file_config.log_dir,
+                    rotation_policy = %file_config.rotation_policy,
+                    max_files = file_config.max_files,
+                    compress_rotated = file_config.compress_rotated,
+                    "📁 Enhanced file logging enabled"
+                );
+            },
+            Err(e) => {
+                tracing::warn!("Failed to initialize file logging: {}", e);
+            }
+        }
+    }
+
+    if external_config.enabled {
+        tracing::info!(
+            service_type = %external_config.service_type,
+            endpoint = %external_config.endpoint,
+            batch_size = external_config.batch_size,
+            flush_interval_secs = external_config.flush_interval_secs,
+            "🌐 External logging enabled"
+        );
+    }
+    
     // Configure output format based on environment
     if config.json_format {
         // Production: JSON structured logging
@@ -61,46 +95,117 @@ pub fn init_tracing() -> Result<()> {
             );
             let (file_writer, _guard) = non_blocking(file_appender);
             
-            // Console + File JSON logging
-            let subscriber = registry
-                .with(fmt::layer()
-                    .json()
-                    .with_writer(io::stdout)
-                    .with_target(true)
-                    .with_thread_ids(true)
-                    .with_thread_names(true))
-                .with(fmt::layer()
-                    .json()
-                    .with_writer(file_writer)
-                    .with_target(true)
-                    .with_thread_ids(true)
-                    .with_thread_names(true));
-            
-            subscriber.init();
+            // Console + File JSON logging with conditional external logging
+            if external_config.enabled {
+                match ExternalLoggingLayer::new(external_config) {
+                    Ok(external_layer) => {
+                        let subscriber = registry
+                            .with(external_layer)
+                            .with(fmt::layer()
+                                .json()
+                                .with_writer(io::stdout)
+                                .with_target(true)
+                                .with_thread_ids(true)
+                                .with_thread_names(true))
+                            .with(fmt::layer()
+                                .json()
+                                .with_writer(file_writer)
+                                .with_target(true)
+                                .with_thread_ids(true)
+                                .with_thread_names(true));
+                        
+                        subscriber.init();
+                    },
+                    Err(e) => {
+                        tracing::warn!("Failed to initialize external logging layer, continuing without it: {}", e);
+                        let subscriber = registry
+                            .with(fmt::layer()
+                                .json()
+                                .with_writer(io::stdout)
+                                .with_target(true)
+                                .with_thread_ids(true)
+                                .with_thread_names(true))
+                            .with(fmt::layer()
+                                .json()
+                                .with_writer(file_writer)
+                                .with_target(true)
+                                .with_thread_ids(true)
+                                .with_thread_names(true));
+                        
+                        subscriber.init();
+                    }
+                }
+            } else {
+                let subscriber = registry
+                    .with(fmt::layer()
+                        .json()
+                        .with_writer(io::stdout)
+                        .with_target(true)
+                        .with_thread_ids(true)
+                        .with_thread_names(true))
+                    .with(fmt::layer()
+                        .json()
+                        .with_writer(file_writer)
+                        .with_target(true)
+                        .with_thread_ids(true)
+                        .with_thread_names(true));
+                
+                subscriber.init();
+            }
             
             // Store the guard to prevent dropping
             // TODO: In a real application, we'd store this guard somewhere persistent
         } else {
-            // Console-only JSON logging
+            // Console-only JSON logging with external logging
+            if external_config.enabled {
+                let external_layer = ExternalLoggingLayer::new(external_config)
+                    .map_err(|e| color_eyre::eyre::eyre!("Failed to create external logging layer: {}", e))?;
+                
+                let subscriber = registry
+                    .with(external_layer)
+                    .with(fmt::layer()
+                        .json()
+                        .with_target(true)
+                        .with_thread_ids(true)
+                        .with_thread_names(true));
+                
+                subscriber.init();
+            } else {
+                let subscriber = registry
+                    .with(fmt::layer()
+                        .json()
+                        .with_target(true)
+                        .with_thread_ids(true)
+                        .with_thread_names(true));
+                
+                subscriber.init();
+            }
+        }
+    } else {
+        // Development/Testing: Pretty console logging with external logging
+        if external_config.enabled {
+            let external_layer = ExternalLoggingLayer::new(external_config)
+                .map_err(|e| color_eyre::eyre::eyre!("Failed to create external logging layer: {}", e))?;
+            
+            let subscriber = registry
+                .with(external_layer)
+                .with(fmt::layer()
+                    .compact()
+                    .with_target(false)
+                    .with_thread_ids(false)
+                    .with_thread_names(false));
+            
+            subscriber.init();
+        } else {
             let subscriber = registry
                 .with(fmt::layer()
-                    .json()
-                    .with_target(true)
-                    .with_thread_ids(true)
-                    .with_thread_names(true));
+                    .compact()
+                    .with_target(false)
+                    .with_thread_ids(false)
+                    .with_thread_names(false));
             
             subscriber.init();
         }
-    } else {
-        // Development/Testing: Pretty console logging
-        let subscriber = registry
-            .with(fmt::layer()
-                .compact()
-                .with_target(false)
-                .with_thread_ids(false)
-                .with_thread_names(false));
-        
-        subscriber.init();
     }
 
     tracing::info!(

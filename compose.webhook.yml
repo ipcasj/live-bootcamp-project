@@ -1,0 +1,54 @@
+# Multi-destination logging with webhook backup
+# This configuration extends compose.dev.yml with dual logging setup
+
+services:
+  # Extend auth-service with dual logging (Loki primary + webhook backup)
+  auth-service-webhook:
+    image: igorp888/auth-service
+    container_name: auth-service-webhook
+    ports:
+      - "3002:3000"  # Different port to avoid conflict with Grafana
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: "postgres://postgres:${POSTGRES_PASSWORD}@db:5432"
+      REDIS_HOST_NAME: redis
+      POSTMARK_AUTH_TOKEN: ${POSTMARK_AUTH_TOKEN}
+      ENVIRONMENT: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_JSON_FORMAT: ${LOG_JSON_FORMAT:-true}
+      LOG_INCLUDE_SENSITIVE: ${LOG_INCLUDE_SENSITIVE:-false}
+      # Webhook-based external logging for testing/backup
+      EXTERNAL_LOGGING_ENABLED: "true"
+      EXTERNAL_LOGGING_SERVICE_TYPE: "webhook"
+      EXTERNAL_LOGGING_ENDPOINT: "http://webhook-test:8080/webhook"
+      EXTERNAL_LOGGING_BATCH_SIZE: "10"
+      EXTERNAL_LOGGING_FLUSH_INTERVAL: "5"
+      FILE_LOGGING_ENABLED: "false"
+    depends_on:
+      - db
+      - redis
+      - webhook-test
+    restart: unless-stopped
+
+  # Extend app-service with dual logging (Loki primary + webhook backup)
+  app-service-webhook:
+    image: igorp888/app-service
+    container_name: app-service-webhook
+    ports:
+      - "8001:8000"  # Different port to avoid conflict
+    environment:
+      AUTH_SERVICE_IP: ${AUTH_SERVICE_IP:-localhost}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_JSON_FORMAT: ${LOG_JSON_FORMAT:-false}
+      LOG_INCLUDE_SENSITIVE: ${LOG_INCLUDE_SENSITIVE:-false}
+      # Webhook-based external logging for testing/backup
+      EXTERNAL_LOGGING_ENABLED: "true"
+      EXTERNAL_LOGGING_SERVICE_TYPE: "webhook"
+      EXTERNAL_LOGGING_ENDPOINT: "http://webhook-test:8080/webhook"
+      EXTERNAL_LOGGING_BATCH_SIZE: "10"
+      EXTERNAL_LOGGING_FLUSH_INTERVAL: "5"
+      FILE_LOGGING_ENABLED: "false"
+    depends_on:
+      - auth-service-webhook
+      - webhook-test
+    restart: unless-stopped

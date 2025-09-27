@@ -1,0 +1,23 @@
+server_configs:
+  - name: default
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: auth-service
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: auth-service
+          service: auth-service
+          __path__: /var/log/auth-service/*.log
+
+  - job_name: app-service
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: app-service
+          service: app-service
+          __path__: /var/log/app-service/*.log

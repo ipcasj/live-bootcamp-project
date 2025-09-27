@@ -2,6 +2,7 @@
 [workspace]
 members = [
 	"auth-service",
-	"app-service"
+	"app-service",
+	"webhook-receiver"
 ]
 resolver = "2"

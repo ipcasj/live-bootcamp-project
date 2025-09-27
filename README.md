@@ -10,6 +10,8 @@ A production-ready authentication service with Redis-backed 2FA, PostgreSQL user
 - **JWT Authentication**: Secure token-based authentication with banned token tracking
 - **Postmark Email Integration**: Production-ready email delivery for 2FA codes and notifications
 - **Runtime-Configurable Logging**: Advanced tracing with adjustable log levels, structured JSON output, and sensitive data filtering
+- **External Logging Integration**: Ship logs to Grafana Loki, AWS CloudWatch, Elasticsearch, OpenTelemetry OTLP, and webhooks
+- **Enhanced File Logging**: Log rotation, compression, and cleanup with configurable policies
 - **Environment Profiles**: Development, test, and production configurations
 - **Type-Safe Configuration**: Validated configuration with graceful error handling
 - **REST & gRPC APIs**: Complete API coverage with OpenAPI documentation
@@ -335,6 +337,38 @@ curl http://localhost:3000/logging/test?level=debug
   "target": "auth_service::routes::login"
 }
 ```
+
+### External Logging Integration
+
+Ship logs to external services for centralized logging, monitoring, and analysis:
+
+**Supported Services:**
+- **Grafana Loki**: Log aggregation with powerful querying
+- **AWS CloudWatch**: Cloud-native logging with AWS integration
+- **Elasticsearch**: Full-text search and analytics
+- **OpenTelemetry OTLP**: Distributed tracing and observability
+- **Generic Webhooks**: Custom HTTP endpoints
+
+**Quick Setup:**
+```bash
+# Enable external logging to Grafana Loki
+export EXTERNAL_LOGGING_ENABLED=true
+export EXTERNAL_LOGGING_SERVICE_TYPE=loki
+export EXTERNAL_LOGGING_ENDPOINT=http://loki:3100/loki/api/v1/push
+
+# Performance configuration
+export EXTERNAL_LOGGING_BATCH_SIZE=100
+export EXTERNAL_LOGGING_FLUSH_INTERVAL_SECS=5
+export EXTERNAL_LOGGING_COMPRESS_PAYLOADS=true
+```
+
+**Advanced Features:**
+- ✅ **Async Batch Processing**: Configurable batch sizes with automatic flushing
+- ✅ **Compression**: Gzip compression for reduced network overhead  
+- ✅ **Retry Logic**: Exponential backoff with circuit breaker pattern
+- ✅ **Enhanced File Logging**: Rotation, compression, and cleanup policies
+
+📖 **Complete Configuration Guide**: [External Logging Documentation](.azure/external-logging-config.md)
 
 ## 📁 Project Structure
 

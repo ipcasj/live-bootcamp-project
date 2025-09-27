@@ -11,7 +11,7 @@ pub async fn health() -> impl IntoResponse {
 }
 /// Signup route handler and types for user registration in the auth-service.
 use utoipa::ToSchema;
-use tracing::{info, error}; // Both info and error are used
+
 /// Signup route handler for user registration.
 ///
 /// - Accepts POST requests with JSON body: { "email": String, "password": String, "requires2FA": bool }

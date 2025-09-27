@@ -27,6 +27,9 @@ async fn main() {
         "🚀 Starting auth-service"
     );
 
+    // Test log for external logging verification
+    tracing::info!("🔍 Testing external logging integration - this message should appear in Loki");
+
     // Configure PostgreSQL and Redis connections with config
     let pg_pool = configure_postgresql(&config).await;
     let redis_pool = configure_redis(&config).await;

@@ -3,6 +3,13 @@ use color_eyre::eyre::Result;
 use tracing::{info, warn, debug, error};
 use tracing_subscriber::{fmt, EnvFilter, prelude::*};
 
+// Import external logging modules
+mod external_logging;
+mod file_logging;
+
+use external_logging::{ExternalLoggingConfig, ExternalLoggingLayer};
+use file_logging::{FileLoggingConfig, FileLoggingManager};
+
 use askama::Template;
 use axum::{
     http::StatusCode,
@@ -16,7 +23,7 @@ use tower_http::services::ServeDir;
 use axum::routing::get_service;
 use std::net::TcpListener;
 
-/// Initialize tracing for the app service
+/// Initialize tracing for the app service with external logging support
 fn init_tracing() -> Result<()> {
     // Create environment filter with sensible defaults
     let filter = EnvFilter::try_from_default_env()
@@ -28,28 +35,100 @@ fn init_tracing() -> Result<()> {
         .unwrap_or_else(|_| "false".to_string())
         .to_lowercase() == "true";
 
-    if use_json {
-        tracing_subscriber::registry()
-            .with(filter)
-            .with(fmt::layer()
-                .json()
-                .with_target(true)
-                .with_thread_ids(true))
-            .init();
+    // Initialize external logging configuration
+    let external_config = ExternalLoggingConfig::from_env();
+    
+    // Initialize enhanced file logging if enabled
+    let file_config = FileLoggingConfig::default();
+    if file_config.enabled {
+        let _file_manager = FileLoggingManager::new(file_config.clone())?;
+        
+        info!(
+            log_dir = ?file_config.log_dir,
+            rotation_policy = %file_config.rotation_policy,
+            max_files = file_config.max_files,
+            "📁 Enhanced file logging enabled for app-service"
+        );
+    }
+
+    if external_config.enabled {
+        info!(
+            service_type = %external_config.service_type,
+            endpoint = %external_config.endpoint,
+            batch_size = external_config.batch_size,
+            "🌐 External logging enabled for app-service"
+        );
+    }
+    
+    let registry = tracing_subscriber::registry()
+        .with(filter);
+
+    // Configure console output format based on external logging
+    if external_config.enabled {
+        match ExternalLoggingLayer::new(external_config.clone()) {
+            Ok(external_layer) => {
+                if use_json {
+                    registry
+                        .with(external_layer)
+                        .with(fmt::layer()
+                            .json()
+                            .with_target(true)
+                            .with_thread_ids(true))
+                        .init();
+                } else {
+                    registry
+                        .with(external_layer)
+                        .with(fmt::layer()
+                            .pretty()
+                            .with_target(false))
+                        .init();
+                }
+            },
+            Err(e) => {
+                tracing::warn!("Failed to initialize external logging layer, continuing without it: {}", e);
+                if use_json {
+                    registry
+                        .with(fmt::layer()
+                            .json()
+                            .with_target(true)
+                            .with_thread_ids(true))
+                        .init();
+                } else {
+                    registry
+                        .with(fmt::layer()
+                            .pretty()
+                            .with_target(false))
+                        .init();
+                }
+            }
+        }
     } else {
-        tracing_subscriber::registry()
-            .with(filter)
-            .with(fmt::layer()
-                .compact()
-                .with_target(false))
-            .init();
+        if use_json {
+            registry
+                .with(fmt::layer()
+                    .json()
+                    .with_target(true)
+                    .with_thread_ids(true))
+                .init();
+        } else {
+            registry
+                .with(fmt::layer()
+                    .compact()
+                    .with_target(false))
+                .init();
+        }
     }
 
     info!(
         version = env!("CARGO_PKG_VERSION"),
         service = "app-service",
-        "🚀 Tracing initialized for app service"
+        external_logging_enabled = external_config.enabled,
+        file_logging_enabled = file_config.enabled,
+        "🚀 Tracing initialized for app service with enhanced logging"
     );
+
+    // Test log for external logging verification
+    info!("🔍 Testing external logging integration - this message should appear in webhook");
 
     Ok(())
 }
