@@ -44,51 +44,21 @@ jobs:
     steps:
       # Checkout code from the repository
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
-      # Cache dependencies to speed up build times
-    - name: Cache dependencies
-      uses: actions/cache@v3
+      # Free up disk space
+    - name: Free Disk Space
+      uses: jlumbroso/free-disk-space@main
       with:
-        path: |
-          app-service/.cargo
-          app-service/target/
-          auth-service/.cargo
-          auth-service/target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: ${{ runner.os }}-cargo-
+        tool-cache: false
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        docker-images: false
+        swap-storage: true
 
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
-
-
-    - name: Install protoc (protobuf-compiler)
-      run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-
-    - name: Build and test app-service code
-      working-directory: ./app-service
-      run: |
-        cargo build --verbose
-        cargo test --verbose
-
-    - name: Build and test auth-service code
-      working-directory: ./auth-service
-      env:
-        DATABASE_URL: postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/postgres
-        JWT_SECRET: test_jwt_secret_key_that_is_32_characters_long_for_github_ci_testing
-        POSTMARK_AUTH_TOKEN: test_token_for_validation
-        ENVIRONMENT: test
-        SQLX_OFFLINE: true
-      run: |
-        cargo build --verbose
-        cargo test --verbose
-        cargo test --test api
-
-      # Set up Docker Buildx for multi-platform builds
+      # Set up Docker Buildx early for better caching
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
@@ -97,6 +67,25 @@ jobs:
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # Test services with Docker to ensure they work
+    - name: Test services with Docker
+      env:
+        DATABASE_URL: postgres://postgres:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/postgres
+        JWT_SECRET: test_jwt_secret_key_that_is_32_characters_long_for_github_ci_testing
+        POSTMARK_AUTH_TOKEN: test_token_for_validation
+        ENVIRONMENT: test
+        SQLX_OFFLINE: true
+      run: |
+        # Build and test in Docker (builds and tests in one step)
+        docker compose -f compose.yml -f compose.override.yml build auth-service
+        docker compose -f compose.yml -f compose.override.yml build app-service
+      
+    # Clean up build cache before final push
+    - name: Clean up build artifacts
+      run: |
+        docker builder prune -f --filter until=24h
+        docker system prune -f
 
     - name: Build and push Docker images
       uses: docker/bake-action@v5

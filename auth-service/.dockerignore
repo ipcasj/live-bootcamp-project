@@ -1,4 +1,44 @@
-.env
+# Ignore target directories to reduce build context
 target/
+*/target/
+
+# Ignore test files that aren't needed for production build
 tests/
+*/tests/
+
+# Ignore development files
+.env
+.env.*
+
+# Ignore Docker files themselves
 Dockerfile
+.dockerignore
+
+# Ignore documentation and markdown files
+README.md
+*.md
+
+# Ignore git directory
+.git/
+.gitignore
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore compose files (not needed in build context)
+compose*.yml
+docker-compose*.yml
+
+# Ignore GitHub workflows
+.github/
+
+# Ignore logs
+*.log
+logs/

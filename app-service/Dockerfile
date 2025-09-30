@@ -17,6 +17,8 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # Build application
 COPY . .
 RUN cargo build --release --bin app-service
+# Strip binary to reduce size
+RUN strip target/release/app-service
 
 # We do not need the Rust toolchain to run the binary!
 # Start with a minimal image and copy over the binary and assets folder.

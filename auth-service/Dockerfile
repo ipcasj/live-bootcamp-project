@@ -8,10 +8,6 @@ WORKDIR /app
 FROM chef AS planner
 COPY . .
 # Capture info needed to build dependencies
-RUN apk add --no-cache openssl-dev pkgconf musl-dev protobuf
-RUN cargo chef prepare --recipe-path recipe.json
-COPY . .
-# Capture info needed to build dependencies
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
@@ -24,6 +20,8 @@ COPY . .
 # Enable SQLx offline mode for builds without database
 ENV SQLX_OFFLINE=true
 RUN cargo build --release --bin auth-service
+# Strip binary to reduce size
+RUN strip target/release/auth-service
 
 # We do not need the Rust toolchain to run the binary!
 # Start with a minimal image and copy over the binary and assets folder.

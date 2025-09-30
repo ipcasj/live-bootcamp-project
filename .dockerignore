@@ -1,0 +1,73 @@
+# Ignore target directories to reduce build context
+target/
+*/target/
+**/target/
+
+# Ignore build artifacts
+Cargo.lock
+debug/
+release/
+
+# Ignore test directories and files
+tests/
+*/tests/
+**/tests/
+
+# Ignore development and environment files
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Ignore Docker files themselves
+Dockerfile
+.dockerignore
+**/Dockerfile
+**/.dockerignore
+
+# Ignore documentation
+README.md
+*.md
+**/*.md
+
+# Ignore git directory and files
+.git/
+.gitignore
+**/.git/
+**/.gitignore
+
+# Ignore IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+**/.vscode/
+**/.idea/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+**/.DS_Store
+**/Thumbs.db
+
+# Ignore compose files (not needed in build context)
+compose*.yml
+docker-compose*.yml
+
+# Ignore GitHub workflows and CI/CD
+.github/
+**/.github/
+
+# Ignore logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+**/logs/
+**/tmp/
+**/temp/
+
+# Ignore external logging and webhook receiver (for build context)
+external-logging/
+webhook-receiver/
+grafana/
